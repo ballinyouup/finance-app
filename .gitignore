@@ -1,0 +1,61 @@
+.env
+/backend/.env
+/frontend/.env
+
+# dependencies
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# build outputs
+frontend/dist/
+frontend/build/
+backend/dist/
+build/
+dist/
+
+# environment variables
+.env
+.env.*
+!.env.example
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# runtime files
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# coverage
+coverage/
+*.lcov
+
+# cache
+.cache/
+.parcel-cache/
+.vite/
+.eslintcache
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# npm/yarn/pnpm
+.npm/
+.yarn/
+.pnpm-store/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# PM2
+.pm2/
