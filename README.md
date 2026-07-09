@@ -47,15 +47,27 @@ npm install
 npm run dev
 ```
 
-The frontend defaults to `http://127.0.0.1:5000/api` in local development and `/api` in production builds. To override it:
+The frontend defaults to `http://127.0.0.1:5000/api` when opened from localhost, to `http://<current-host>:5000/api` when opened from a non-local host in dev mode, and to `/api` in production builds. To override it:
 
 ```bash
 VITE_API_URL=http://127.0.0.1:5000/api npm run dev
 ```
 
-For deployment, set `VITE_API_URL` at frontend build time unless the backend is reverse-proxied at `https://moneysim.app/api`.
+For deployment, do not build the frontend with `VITE_API_URL=http://127.0.0.1:5000/api`. Browser requests to `127.0.0.1` go to the visitor's computer, not the server.
 
-Examples:
+If the backend is reverse-proxied at the same origin, use:
+
+```bash
+VITE_API_URL=/api npm run build
+```
+
+If the backend is directly reachable on port `5000`, use the server host:
+
+```bash
+VITE_API_URL=http://207.148.15.2:5000/api npm run build
+```
+
+For the production domain later:
 
 ```bash
 VITE_API_URL=https://api.moneysim.app/api npm run build
@@ -64,8 +76,8 @@ VITE_API_URL=https://api.moneysim.app/api npm run build
 Backend production values should match the deployed frontend:
 
 ```bash
-FRONTEND_URL=https://moneysim.app
-CORS_ORIGIN=https://moneysim.app
+FRONTEND_URL=http://207.148.15.2
+CORS_ORIGIN=http://207.148.15.2
 ```
 
 ## Verification

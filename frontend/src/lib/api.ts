@@ -1,6 +1,14 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL ??
-  (import.meta.env.PROD ? "/api" : "http://127.0.0.1:5000/api")
+const isLocalhost =
+  typeof window !== "undefined" &&
+  ["localhost", "127.0.0.1"].includes(window.location.hostname)
+
+const defaultApiBaseUrl = import.meta.env.PROD
+  ? "/api"
+  : isLocalhost
+    ? "http://127.0.0.1:5000/api"
+    : `${window.location.protocol}//${window.location.hostname}:5000/api`
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || defaultApiBaseUrl
 const TOKEN_KEY = "finance_access_token"
 const DEBUG_API = import.meta.env.DEV
 
