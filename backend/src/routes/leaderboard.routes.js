@@ -14,7 +14,7 @@ const leaderboardSchema = z.object({
 
 leaderboardRouter.get("/", validate(leaderboardSchema), async (req, res, next) => {
   try {
-    const sessions = await GameSession.find({ status: "completed" })
+    const sessions = await GameSession.find({ status: "dead" })
       .sort({ finalScore: -1, completedAt: 1 })
       .limit(req.validated.query.limit)
       .populate("userId", "name");

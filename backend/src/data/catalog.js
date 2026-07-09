@@ -4,9 +4,28 @@ export const REQUIRED_EXPENSE_CATEGORIES = [
   "Transportation",
   "Entertainment"
 ];
+export const MONTHLY_EXPENSE_CATEGORIES = [
+  "Housing",
+  "Transportation"
+];
 
 export const STARTING_BALANCE = 500;
-export const TOTAL_ROUNDS = 12;
+export const DAYS_PER_MONTH = 30;
+export const STARTING_AGE_MONTHS = 18 * 12;
+export const STARTING_NEEDS = {
+  happiness: 70,
+  hunger: 70,
+  entertainment: 70,
+  love: 50
+};
+
+export const LIFE_PATHS = ["work", "college"];
+
+export const MONTHLY_CHOICE_LIMITS = {
+  foodDays: { min: 0, max: DAYS_PER_MONTH },
+  entertainmentDays: { min: 0, max: DAYS_PER_MONTH },
+  datingDays: { min: 0, max: DAYS_PER_MONTH }
+};
 
 export const jobsSeed = [
   { title: "Barista", monthlySalary: 1800, tier: 1 },

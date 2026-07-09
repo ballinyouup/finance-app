@@ -26,6 +26,7 @@ export type ExpenseCategory =
   | "Food"
   | "Transportation"
   | "Entertainment"
+export type MonthlyExpenseCategory = "Housing" | "Transportation"
 
 export type ExpenseOption = {
   _id: string
@@ -35,22 +36,48 @@ export type ExpenseOption = {
   monthlyCost: number
 }
 
-export type ExpenseSelections = Record<ExpenseCategory, string>
-export type PopulatedExpenseSelections = Record<ExpenseCategory, ExpenseOption>
+export type ExpenseSelections = Record<MonthlyExpenseCategory, string>
+export type PopulatedExpenseSelections = Record<MonthlyExpenseCategory, ExpenseOption>
+export type NeedScores = {
+  happiness: number
+  hunger: number
+  entertainment: number
+  love: number
+}
+export type LifePath = "work" | "college"
+export type MonthlyChoices = {
+  foodDays: number
+  entertainmentDays: number
+  datingDays: number
+}
 
 export type RoundHistory = {
-  round: number
+  month: number
+  ageMonths: number
+  path: LifePath
   jobTitle: string
-  salary: number
+  income: number
   expenses: number
+  eventTitle?: string
+  eventAmount?: number
+  deathChance: number
+  died: boolean
+  needsAfter: NeedScores
   balanceAfter: number
+  studentDebtAfter: number
 }
 
 export type GameSession = {
   _id: string
-  status: "active" | "completed"
-  currentRound: number
+  status: "active" | "dead"
+  lifePath: LifePath
+  currentMonth: number
+  ageMonths: number
   balance: number
+  studentDebt: number
+  educationMonths: number
+  needs: NeedScores
+  monthlyChoices: MonthlyChoices
   currentJobId: Job
   currentExpenseSelections: PopulatedExpenseSelections
   history: RoundHistory[]
@@ -162,7 +189,7 @@ export const api = {
     apiRequest<{ session: GameSession | null }>("/game/current", { token }),
   startSession: (
     token: string,
-    payload: { jobId: string; expenseSelections: ExpenseSelections },
+    payload: { lifePath: LifePath; jobId: string; expenseSelections: ExpenseSelections },
   ) =>
     apiRequest<{ session: GameSession }>("/game/start", {
       method: "POST",
@@ -184,10 +211,11 @@ export const api = {
       token,
       body: JSON.stringify(payload),
     }),
-  advanceMonth: (token: string) =>
+  advanceMonths: (token: string, months: number, choices: Partial<MonthlyChoices>) =>
     apiRequest<{ session: GameSession }>("/game/advance", {
       method: "POST",
       token,
+      body: JSON.stringify({ months, choices }),
     }),
   leaderboard: (limit = 20) =>
     apiRequest<{ entries: LeaderboardEntry[] }>(`/leaderboard?limit=${limit}`),

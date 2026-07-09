@@ -4,7 +4,7 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { app } from "../app.js";
-import { REQUIRED_EXPENSE_CATEGORIES } from "../data/catalog.js";
+import { MONTHLY_EXPENSE_CATEGORIES, STARTING_AGE_MONTHS } from "../data/catalog.js";
 import { ExpenseOption } from "../models/ExpenseOption.js";
 import { GameSession } from "../models/GameSession.js";
 import { Job } from "../models/Job.js";
@@ -12,15 +12,22 @@ import { User } from "../models/User.js";
 import { seedCatalog } from "../seed/seedCatalog.js";
 import { hashToken, signAccessToken } from "../services/token.service.js";
 
+vi.mock("../services/email.service.js", () => ({
+  sendVerificationEmail: vi.fn()
+}));
+
 let mongoServer;
 
 beforeAll(async () => {
   vi.spyOn(console, "log").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+  vi.spyOn(console, "error").mockImplementation(() => {});
   mongoServer = await MongoMemoryServer.create({ instance: { ip: "127.0.0.1" } });
   await mongoose.connect(mongoServer.getUri());
 });
 
 beforeEach(async () => {
+  vi.spyOn(Math, "random").mockReturnValue(1);
   await mongoose.connection.db.dropDatabase();
   await seedCatalog();
 });
@@ -48,7 +55,7 @@ async function authHeader(user) {
 async function lowExpenseSelections() {
   const options = await ExpenseOption.find({ tier: "Low" });
   return Object.fromEntries(
-    REQUIRED_EXPENSE_CATEGORIES.map((category) => [
+    MONTHLY_EXPENSE_CATEGORIES.map((category) => [
       category,
       options.find((option) => option.category === category)._id.toString()
     ])
@@ -162,7 +169,7 @@ describe("catalog and game routes", () => {
     expect(duplicate.body.error.code).toBe("ACTIVE_SESSION_EXISTS");
   });
 
-  it("advances through 12 months and completes with the correct final score", async () => {
+  it("advances one month or one year and keeps the run active when death is not rolled", async () => {
     const user = await createUser();
     const authorization = await authHeader(user);
     const job = await Job.findOne({ title: "Barista" });
@@ -171,32 +178,58 @@ describe("catalog and game routes", () => {
     await request(app)
       .post("/api/game/start")
       .set("Authorization", authorization)
-      .send({ jobId: job._id.toString(), expenseSelections });
+      .send({ lifePath: "work", jobId: job._id.toString(), expenseSelections });
 
-    let latest;
+    const advanced = await request(app)
+      .post("/api/game/advance")
+      .set("Authorization", authorization)
+      .send({
+        months: 12,
+        choices: { foodDays: 20, entertainmentDays: 4, datingDays: 2 }
+      });
 
-    for (let month = 1; month <= 12; month += 1) {
-      latest = await request(app)
-        .post("/api/game/advance")
-        .set("Authorization", authorization);
-      expect(latest.status).toBe(200);
-    }
-
-    const session = latest.body.data.session;
-    expect(session.status).toBe("completed");
+    const session = advanced.body.data.session;
+    expect(advanced.status).toBe(200);
+    expect(session.status).toBe("active");
     expect(session.history).toHaveLength(12);
-    expect(session.finalScore).toBe(8420);
+    expect(session.ageMonths).toBe(STARTING_AGE_MONTHS + 12);
 
     const current = await request(app)
       .get("/api/game/current")
       .set("Authorization", authorization);
 
-    expect(current.body.data.session).toBeNull();
+    expect(current.body.data.session.status).toBe("active");
+  });
+
+  it("ends the run when statistical death is rolled", async () => {
+    Math.random.mockReturnValue(0);
+    const user = await createUser();
+    const authorization = await authHeader(user);
+    const job = await Job.findOne({ title: "Barista" });
+    const expenseSelections = await lowExpenseSelections();
+
+    await request(app)
+      .post("/api/game/start")
+      .set("Authorization", authorization)
+      .send({ lifePath: "work", jobId: job._id.toString(), expenseSelections });
+
+    const advanced = await request(app)
+      .post("/api/game/advance")
+      .set("Authorization", authorization)
+      .send({
+        months: 1,
+        choices: { foodDays: 0, entertainmentDays: 0, datingDays: 0 }
+      });
+
+    const session = advanced.body.data.session;
+    expect(advanced.status).toBe(200);
+    expect(session.status).toBe("dead");
+    expect(session.finalScore).toEqual(expect.any(Number));
   });
 });
 
 describe("leaderboard routes", () => {
-  it("is public and returns completed runs sorted by score", async () => {
+  it("is public and returns dead runs sorted by score", async () => {
     const lowUser = await createUser({
       email: "low@example.com",
       name: "Low Score"
@@ -209,8 +242,9 @@ describe("leaderboard routes", () => {
     await GameSession.create([
       {
         userId: lowUser._id,
-        status: "completed",
-        currentRound: 12,
+        status: "dead",
+        currentMonth: 12,
+        ageMonths: STARTING_AGE_MONTHS + 12,
         balance: 100,
         currentJobId: (await Job.findOne())._id,
         currentExpenseSelections: await lowExpenseSelections(),
@@ -219,8 +253,9 @@ describe("leaderboard routes", () => {
       },
       {
         userId: highUser._id,
-        status: "completed",
-        currentRound: 12,
+        status: "dead",
+        currentMonth: 12,
+        ageMonths: STARTING_AGE_MONTHS + 12,
         balance: 900,
         currentJobId: (await Job.findOne())._id,
         currentExpenseSelections: await lowExpenseSelections(),

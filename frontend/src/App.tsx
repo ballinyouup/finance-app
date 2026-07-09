@@ -79,16 +79,19 @@ import {
   type GameSession,
   type Job,
   type LeaderboardEntry,
+  type LifePath,
+  type MonthlyChoices,
+  type MonthlyExpenseCategory,
   type User,
 } from "@/lib/api"
 import "./App.css"
 
-const categories: ExpenseCategory[] = [
-  "Housing",
-  "Food",
-  "Transportation",
-  "Entertainment",
-]
+const monthlyCategories: MonthlyExpenseCategory[] = ["Housing", "Transportation"]
+const startingMonthlyChoices: MonthlyChoices = {
+  foodDays: 20,
+  entertainmentDays: 4,
+  datingDays: 2,
+}
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -262,15 +265,15 @@ function HomePage({ user }: { user: User | null }) {
       <section className="grid gap-6 py-8 md:grid-cols-[1.1fr_0.9fr] md:items-center">
         <div className="grid gap-5">
           <Badge className="w-fit bg-emerald-700 text-white hover:bg-emerald-700">
-            12-month finance simulation
+            Lifetime finance simulation
           </Badge>
           <div className="grid gap-3">
             <h1 className="max-w-3xl text-4xl font-semibold tracking-normal sm:text-5xl">
               Start with a job. Survive 12 months. See how much you can save.
             </h1>
             <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-              Pick an income, tune your monthly lifestyle, and climb the public
-              leaderboard with the highest final bank balance.
+              Start at 18, choose work or college, manage monthly life, and climb
+              the public leaderboard with the strongest money-and-wellbeing score.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -293,17 +296,17 @@ function HomePage({ user }: { user: User | null }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <WalletCards className="size-5 text-emerald-700" aria-hidden="true" />
-              Monthly Decision Board
+              Life Decision Board
             </CardTitle>
             <CardDescription>
-              Balance income against rent, food, transportation, and fun.
+              Balance income against needs, relationships, random events, and fun.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             {[
               ["Income", "$4,000", "Marketing Coordinator"],
               ["Expenses", "$1,640", "Low housing, mixed food"],
-              ["Monthly Net", "$2,360", "Added to balance"],
+              ["Monthly Plan", "$760", "Food, fun, and dating"],
             ].map(([label, value, note]) => (
               <div
                 className="flex items-center justify-between rounded-lg border bg-background p-3"
@@ -329,12 +332,12 @@ function HomePage({ user }: { user: User | null }) {
         <FeatureCard
           icon={<Banknote className="size-5" aria-hidden="true" />}
           title="Manage Your Expenses"
-          text="Choose low, mid, or high tiers for the four required categories."
+          text="Choose low, mid, or high tiers, but cheap choices can drain needs."
         />
         <FeatureCard
           icon={<Trophy className="size-5" aria-hidden="true" />}
           title="Climb the Leaderboard"
-          text="Completed runs are ranked publicly by final score."
+          text="Completed runs are ranked by final score, not cash alone."
         />
       </section>
     </div>
@@ -640,7 +643,7 @@ function DashboardPage({ token }: { token: string }) {
   const [jobs, setJobs] = useState<Job[]>([])
   const [options, setOptions] = useState<ExpenseOption[]>([])
   const [session, setSession] = useState<GameSession | null>(null)
-  const [completedSession, setCompletedSession] = useState<GameSession | null>(null)
+  const [deadSession, setDeadSession] = useState<GameSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -684,14 +687,18 @@ function DashboardPage({ token }: { token: string }) {
     }
   }, [token])
 
-  async function startRun(jobId: string, expenseSelections: ExpenseSelections) {
+  async function startRun(
+    lifePath: LifePath,
+    jobId: string,
+    expenseSelections: ExpenseSelections,
+  ) {
     setBusy(true)
     setError(null)
 
     try {
-      const data = await api.startSession(token, { jobId, expenseSelections })
+      const data = await api.startSession(token, { lifePath, jobId, expenseSelections })
       setSession(data.session)
-      setCompletedSession(null)
+      setDeadSession(null)
     } catch (startError) {
       if (startError instanceof ApiRequestError && startError.code === "ACTIVE_SESSION_EXISTS") {
         const current = await api.currentSession(token)
@@ -719,7 +726,7 @@ function DashboardPage({ token }: { token: string }) {
     }
   }
 
-  async function updateExpense(category: ExpenseCategory, optionId: string) {
+  async function updateExpense(category: MonthlyExpenseCategory, optionId: string) {
     setBusy(true)
     setError(null)
 
@@ -733,15 +740,15 @@ function DashboardPage({ token }: { token: string }) {
     }
   }
 
-  async function advanceMonth() {
+  async function advanceMonths(months: number, choices: MonthlyChoices) {
     setBusy(true)
     setError(null)
 
     try {
-      const data = await api.advanceMonth(token)
+      const data = await api.advanceMonths(token, months, choices)
 
-      if (data.session.status === "completed") {
-        setCompletedSession(data.session)
+      if (data.session.status === "dead") {
+        setDeadSession(data.session)
         setSession(null)
       } else {
         setSession(data.session)
@@ -767,7 +774,7 @@ function DashboardPage({ token }: { token: string }) {
           </p>
         </div>
         <Badge variant={session ? "default" : "secondary"}>
-          {session ? "Active Run" : completedSession ? "Run Complete" : "Ready"}
+          {session ? "Alive" : deadSession ? "Life Ended" : "Ready"}
         </Badge>
       </div>
 
@@ -778,11 +785,11 @@ function DashboardPage({ token }: { token: string }) {
         </Alert>
       ) : null}
 
-      {completedSession ? (
+      {deadSession ? (
         <ResultsScreen
           jobs={jobs}
           optionsByCategory={optionsByCategory}
-          session={completedSession}
+          session={deadSession}
           busy={busy}
           onPlayAgain={startRun}
         />
@@ -792,7 +799,7 @@ function DashboardPage({ token }: { token: string }) {
           jobs={jobs}
           optionsByCategory={optionsByCategory}
           session={session}
-          onAdvance={advanceMonth}
+          onAdvance={advanceMonths}
           onChangeExpense={updateExpense}
           onChangeJob={updateJob}
         />
@@ -817,8 +824,13 @@ function StartRunPanel({
   jobs: Job[]
   optionsByCategory: Record<ExpenseCategory, ExpenseOption[]>
   busy: boolean
-  onStart: (jobId: string, expenseSelections: ExpenseSelections) => void
+  onStart: (
+    lifePath: LifePath,
+    jobId: string,
+    expenseSelections: ExpenseSelections,
+  ) => void
 }) {
+  const [lifePath, setLifePath] = useState<LifePath>("work")
   const [jobId, setJobId] = useState(() => jobs[0]?._id ?? "")
   const [selections, setSelections] = useState<ExpenseSelections>(() =>
     defaultSelections(optionsByCategory),
@@ -839,12 +851,37 @@ function StartRunPanel({
       <CardHeader>
         <CardTitle>Start New Run</CardTitle>
         <CardDescription>
-          Choose a starting job and a tier for each expense category.
+          Start freshly 18. Choose work now or college with loans.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
         <div className="grid gap-2">
-          <Label>Starting job</Label>
+          <Label>Path</Label>
+          <Select
+            items={[
+              { label: "Work full-time", value: "work" },
+              { label: "College with student loans", value: "college" },
+            ]}
+            value={lifePath}
+            onValueChange={(value) => {
+              if (value) {
+                setLifePath(value as LifePath)
+              }
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Choose a life path" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="work">Work full-time</SelectItem>
+                <SelectItem value="college">College with student loans</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-2">
+          <Label>{lifePath === "college" ? "Part-time job while enrolled" : "Starting job"}</Label>
           <JobSelect jobs={jobs} value={jobId} onValueChange={setJobId} />
         </div>
         <ExpensePickerGrid
@@ -857,7 +894,7 @@ function StartRunPanel({
         <Button
           className="w-fit"
           disabled={busy || !jobId || !hasAllSelections(selections)}
-          onClick={() => onStart(jobId, selections)}
+          onClick={() => onStart(lifePath, jobId, selections)}
         >
           <Play className="size-4" aria-hidden="true" />
           {busy ? "Starting..." : "Start Simulation"}
@@ -880,32 +917,65 @@ function ActiveSession({
   jobs: Job[]
   optionsByCategory: Record<ExpenseCategory, ExpenseOption[]>
   busy: boolean
-  onAdvance: () => void
+  onAdvance: (months: number, choices: MonthlyChoices) => void
   onChangeJob: (jobId: string) => void
-  onChangeExpense: (category: ExpenseCategory, optionId: string) => void
+  onChangeExpense: (category: MonthlyExpenseCategory, optionId: string) => void
 }) {
   const expenseTotal = sumSelectedExpenses(session)
-  const monthlyNet = session.currentJobId.monthlySalary - expenseTotal
+  const [choices, setChoices] = useState<MonthlyChoices>(
+    session.monthlyChoices ?? startingMonthlyChoices,
+  )
+  const lastHistory = session.history.at(-1)
+  const ageYears = Math.floor(session.ageMonths / 12)
+  const ageRemainderMonths = session.ageMonths % 12
+  const foodCost = choices.foodDays * 13
+  const entertainmentCost = choices.entertainmentDays * 18
+  const datingCost = choices.datingDays * 38
+  const projectedVariable = foodCost + entertainmentCost + datingCost
 
   return (
     <div className="grid gap-5">
       <section className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Current Round" value={`Month ${session.currentRound} / 12`} />
+        <StatCard
+          label="Age"
+          value={`${ageYears}y ${ageRemainderMonths}m`}
+          note={`Month ${session.currentMonth}`}
+        />
         <StatCard label="Current Balance" value={money(session.balance)} />
         <StatCard
-          label="Monthly Net"
-          value={money(monthlyNet)}
-          note={monthlyNet >= 0 ? "Surplus this month" : "Deficit this month"}
+          label="Student Debt"
+          value={money(session.studentDebt)}
+          note={session.lifePath === "college" ? `${session.educationMonths} college months` : "Not enrolled"}
         />
       </section>
+
+      <section className="grid gap-4 md:grid-cols-4">
+        <NeedCard label="Happiness" value={session.needs.happiness} />
+        <NeedCard label="Hunger" value={session.needs.hunger} />
+        <NeedCard label="Entertainment" value={session.needs.entertainment} />
+        <NeedCard label="Love" value={session.needs.love} />
+      </section>
+
+      {lastHistory?.eventTitle ? (
+        <Alert>
+          <AlertTitle>Last month’s event</AlertTitle>
+          <AlertDescription>
+            {lastHistory.eventTitle}
+            {lastHistory.eventAmount
+              ? ` (${lastHistory.eventAmount > 0 ? "+" : ""}${money(lastHistory.eventAmount)})`
+              : ""}
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
         <Card>
           <CardHeader>
             <CardTitle>Job</CardTitle>
             <CardDescription>
-              {session.currentJobId.title} earns {money(session.currentJobId.monthlySalary)}
-              /month.
+              {session.lifePath === "college" && session.educationMonths < 48
+                ? `${session.currentJobId.title} is your part-time job while enrolled.`
+                : `${session.currentJobId.title} is your current job.`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -920,8 +990,10 @@ function ActiveSession({
 
         <Card>
           <CardHeader>
-            <CardTitle>Expenses</CardTitle>
-            <CardDescription>Total monthly cost: {money(expenseTotal)}</CardDescription>
+            <CardTitle>Monthly commitments</CardTitle>
+            <CardDescription>
+              Housing and transportation: {money(expenseTotal)}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ExpensePickerGrid
@@ -934,12 +1006,57 @@ function ActiveSession({
         </Card>
       </div>
 
-      <div className="flex justify-end">
-        <Button size="lg" disabled={busy} onClick={onAdvance}>
-          <RefreshCw className="size-4" aria-hidden="true" />
-          {busy ? "Advancing..." : "Advance Month"}
-        </Button>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Monthly plan</CardTitle>
+          <CardDescription>
+            Food, entertainment, and dating are daily choices inside the month. You can skip eating, but hunger and death risk will move.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <MonthlyChoiceInput
+              label="Days eating"
+              value={choices.foodDays}
+              cost={foodCost}
+              onChange={(foodDays) => setChoices((current) => ({ ...current, foodDays }))}
+            />
+            <MonthlyChoiceInput
+              label="Entertainment days"
+              value={choices.entertainmentDays}
+              cost={entertainmentCost}
+              onChange={(entertainmentDays) =>
+                setChoices((current) => ({ ...current, entertainmentDays }))
+              }
+            />
+            <MonthlyChoiceInput
+              label="Dating days"
+              value={choices.datingDays}
+              cost={datingCost}
+              onChange={(datingDays) => setChoices((current) => ({ ...current, datingDays }))}
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              Planned variable spending: {money(projectedVariable)}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="lg" disabled={busy} onClick={() => onAdvance(1, choices)}>
+                <RefreshCw className="size-4" aria-hidden="true" />
+                {busy ? "Advancing..." : "Advance Month"}
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                disabled={busy}
+                onClick={() => onAdvance(12, choices)}
+              >
+                Advance Year
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <HistoryTable session={session} />
     </div>
@@ -957,17 +1074,26 @@ function ResultsScreen({
   jobs: Job[]
   optionsByCategory: Record<ExpenseCategory, ExpenseOption[]>
   busy: boolean
-  onPlayAgain: (jobId: string, expenseSelections: ExpenseSelections) => void
+  onPlayAgain: (
+    lifePath: LifePath,
+    jobId: string,
+    expenseSelections: ExpenseSelections,
+  ) => void
 }) {
+  const ageYears = Math.floor(session.ageMonths / 12)
+  const ageRemainderMonths = session.ageMonths % 12
+
   return (
     <Card className="border-emerald-700/20">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Medal className="size-5 text-emerald-700" aria-hidden="true" />
-          Run Complete
+          Life Ended
         </CardTitle>
         <CardDescription>
-          Final score: {money(session.finalScore ?? session.balance)}
+          Age {ageYears}y {ageRemainderMonths}m · Final score:{" "}
+          {money(session.finalScore ?? session.balance)} · Cash: {money(session.balance)} ·
+          Debt: {money(session.studentDebt)}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-3">
@@ -978,7 +1104,7 @@ function ResultsScreen({
           variant="outline"
           disabled={busy || !jobs[0]}
           onClick={() =>
-            onPlayAgain(jobs[0]._id, defaultSelections(optionsByCategory))
+            onPlayAgain("work", jobs[0]._id, defaultSelections(optionsByCategory))
           }
         >
           Play Again
@@ -1076,11 +1202,11 @@ function ExpensePickerGrid({
   optionsByCategory: Record<ExpenseCategory, ExpenseOption[]>
   selections: ExpenseSelections
   disabled?: boolean
-  onChange: (category: ExpenseCategory, optionId: string) => void
+  onChange: (category: MonthlyExpenseCategory, optionId: string) => void
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      {categories.map((category) => (
+      {monthlyCategories.map((category) => (
         <div className="grid gap-2" key={category}>
           <Label>{category}</Label>
           <Select
@@ -1116,29 +1242,41 @@ function ExpensePickerGrid({
 }
 
 function HistoryTable({ session }: { session: GameSession }) {
+  const recentHistory = session.history.slice(-14).reverse()
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>History</CardTitle>
-        <CardDescription>Past months in this run.</CardDescription>
+        <CardDescription>Most recent months in this life.</CardDescription>
       </CardHeader>
       <CardContent>
         {session.history.length ? (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Round</TableHead>
+                <TableHead>Month</TableHead>
                 <TableHead>Job</TableHead>
+                <TableHead>Event</TableHead>
+                <TableHead className="text-right">Income</TableHead>
                 <TableHead className="text-right">Expenses</TableHead>
+                <TableHead className="text-right">Debt</TableHead>
+                <TableHead className="text-right">Death Risk</TableHead>
                 <TableHead className="text-right">Balance After</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {session.history.map((round) => (
-                <TableRow key={round.round}>
-                  <TableCell>{round.round}</TableCell>
+              {recentHistory.map((round) => (
+                <TableRow key={round.month}>
+                  <TableCell>{round.month}</TableCell>
                   <TableCell>{round.jobTitle}</TableCell>
+                  <TableCell>{round.eventTitle ?? "None"}</TableCell>
+                  <TableCell className="text-right">{money(round.income)}</TableCell>
                   <TableCell className="text-right">{money(round.expenses)}</TableCell>
+                  <TableCell className="text-right">{money(round.studentDebtAfter)}</TableCell>
+                  <TableCell className="text-right">
+                    {(round.deathChance * 100).toFixed(2)}%
+                  </TableCell>
                   <TableCell className="text-right">{money(round.balanceAfter)}</TableCell>
                 </TableRow>
               ))}
@@ -1193,7 +1331,7 @@ function LeaderboardPage({ user }: { user: User | null }) {
         <div>
           <h1 className="text-3xl font-semibold tracking-normal">Leaderboard</h1>
           <p className="text-muted-foreground">
-            Public rankings from completed 12-month runs.
+            Public rankings from lives that ended.
           </p>
         </div>
         {!user ? (
@@ -1248,7 +1386,7 @@ function LeaderboardPage({ user }: { user: User | null }) {
                 className="size-10 text-muted-foreground"
                 aria-hidden="true"
               />
-              <p className="font-medium">No runs completed yet — be the first!</p>
+              <p className="font-medium">No finished lives yet — be the first!</p>
             </div>
           )}
         </CardContent>
@@ -1294,6 +1432,55 @@ function StatCard({
   )
 }
 
+function NeedCard({ label, value }: { label: string; value: number }) {
+  const rounded = Math.round(value)
+  const status = rounded < 25 ? "Critical" : rounded < 50 ? "Strained" : "Stable"
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardDescription>{label}</CardDescription>
+        <CardTitle className="text-2xl">{rounded}</CardTitle>
+        <div className="h-2 overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-emerald-700"
+            style={{ width: `${Math.max(0, Math.min(100, rounded))}%` }}
+          />
+        </div>
+        <p className="text-sm text-muted-foreground">{status}</p>
+      </CardHeader>
+    </Card>
+  )
+}
+
+function MonthlyChoiceInput({
+  label,
+  value,
+  cost,
+  onChange,
+}: {
+  label: string
+  value: number
+  cost: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <div className="grid gap-2">
+      <Label>{label}</Label>
+      <Input
+        type="number"
+        min={0}
+        max={30}
+        value={value}
+        onChange={(event) =>
+          onChange(Math.max(0, Math.min(30, Number(event.target.value))))
+        }
+      />
+      <p className="text-sm text-muted-foreground">{money(cost)} planned</p>
+    </div>
+  )
+}
+
 function PageSkeleton() {
   return (
     <div className="grid gap-4">
@@ -1321,7 +1508,7 @@ function groupOptions(options: ExpenseOption[]) {
     grouped[option.category].push(option)
   }
 
-  for (const category of categories) {
+  for (const category of monthlyCategories) {
     grouped[category].sort((a, b) => a.monthlyCost - b.monthlyCost)
   }
 
@@ -1332,7 +1519,7 @@ function defaultSelections(
   optionsByCategory: Record<ExpenseCategory, ExpenseOption[]>,
 ) {
   return Object.fromEntries(
-    categories.map((category) => [
+    monthlyCategories.map((category) => [
       category,
       optionsByCategory[category].find((option) => option.tier === "Low")
         ?._id ?? optionsByCategory[category][0]?._id ?? "",
@@ -1341,12 +1528,12 @@ function defaultSelections(
 }
 
 function hasAllSelections(selections: ExpenseSelections) {
-  return categories.every((category) => selections[category])
+  return monthlyCategories.every((category) => selections[category])
 }
 
 function selectedIds(session: GameSession) {
   return Object.fromEntries(
-    categories.map((category) => [
+    monthlyCategories.map((category) => [
       category,
       session.currentExpenseSelections[category]._id,
     ]),
@@ -1354,7 +1541,7 @@ function selectedIds(session: GameSession) {
 }
 
 function sumSelectedExpenses(session: GameSession) {
-  return categories.reduce(
+  return monthlyCategories.reduce(
     (total, category) =>
       total + session.currentExpenseSelections[category].monthlyCost,
     0,
