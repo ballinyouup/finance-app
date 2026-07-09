@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:5000/api"
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ??
+  (import.meta.env.PROD ? "/api" : "http://127.0.0.1:5000/api")
 const TOKEN_KEY = "finance_access_token"
 const DEBUG_API = import.meta.env.DEV
 

@@ -33,6 +33,7 @@ JWT_EXPIRES_IN=1h
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=MoneySim <no-reply@moneysim.app>
 FRONTEND_URL=http://localhost:5173
+CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173,https://moneysim.app
 PORT=5000
 ```
 
@@ -46,10 +47,25 @@ npm install
 npm run dev
 ```
 
-The frontend defaults to `http://127.0.0.1:5000/api`. To override it:
+The frontend defaults to `http://127.0.0.1:5000/api` in local development and `/api` in production builds. To override it:
 
 ```bash
 VITE_API_URL=http://127.0.0.1:5000/api npm run dev
+```
+
+For deployment, set `VITE_API_URL` at frontend build time unless the backend is reverse-proxied at `https://moneysim.app/api`.
+
+Examples:
+
+```bash
+VITE_API_URL=https://api.moneysim.app/api npm run build
+```
+
+Backend production values should match the deployed frontend:
+
+```bash
+FRONTEND_URL=https://moneysim.app
+CORS_ORIGIN=https://moneysim.app
 ```
 
 ## Verification
