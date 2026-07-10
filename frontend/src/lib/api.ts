@@ -5,12 +5,13 @@ const isLocalhost =
 const defaultApiBaseUrl = import.meta.env.PROD
   ? "/api"
   : isLocalhost
-    ? "http://127.0.0.1:5000/api"
-    : `${window.location.protocol}//${window.location.hostname}:5000/api`
+    ? "http://127.0.0.1:5050/api"
+    : `${window.location.protocol}//${window.location.hostname}:5050/api`
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || defaultApiBaseUrl
 const TOKEN_KEY = "finance_access_token"
-const DEBUG_API = import.meta.env.DEV
+const DEBUG_API = import.meta.env.DEV || import.meta.env.VITE_DEBUG_API === "true"
+const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS ?? 30000)
 
 export type ApiErrorBody = {
   code: string
@@ -135,6 +136,7 @@ async function apiRequest<T>(
 ) {
   const method = options.method ?? "GET"
   const url = `${API_BASE_URL}${path}`
+  const controller = new AbortController()
   const headers = new Headers(options.headers)
   headers.set("Content-Type", "application/json")
 
@@ -146,8 +148,51 @@ async function apiRequest<T>(
     console.info("[MoneySim API] request", { method, path, url })
   }
 
-  const response = await fetch(url, { ...options, headers })
-  const envelope = (await response.json()) as ApiEnvelope<T>
+  const timeoutId = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+  let response: Response
+
+  try {
+    response = await fetch(url, { ...options, headers, signal: controller.signal })
+  } catch (requestError) {
+    const isTimeout =
+      requestError instanceof DOMException && requestError.name === "AbortError"
+    const error = new ApiRequestError(0, {
+      code: isTimeout ? "REQUEST_TIMEOUT" : "NETWORK_ERROR",
+      message: isTimeout
+        ? `Request timed out after ${Math.round(API_TIMEOUT_MS / 1000)} seconds.`
+        : "Could not reach the API server.",
+    })
+
+    console.error("[MoneySim API] request failed", {
+      method,
+      path,
+      url,
+      code: error.code,
+      message: error.message,
+    })
+    throw error
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
+
+  let envelope: ApiEnvelope<T>
+
+  try {
+    envelope = (await response.json()) as ApiEnvelope<T>
+  } catch {
+    const error = new ApiRequestError(response.status, {
+      code: "INVALID_RESPONSE",
+      message: "The API returned a response the app could not read.",
+    })
+
+    console.error("[MoneySim API] invalid response", {
+      method,
+      path,
+      url,
+      status: response.status,
+    })
+    throw error
+  }
 
   if (DEBUG_API) {
     console.info("[MoneySim API] response", {
@@ -164,6 +209,14 @@ async function apiRequest<T>(
       ? { code: "REQUEST_FAILED", message: "Request failed." }
       : envelope.error
 
+    console.error("[MoneySim API] response error", {
+      method,
+      path,
+      url,
+      status: response.status,
+      code: apiError.code,
+      message: apiError.message,
+    })
     throw new ApiRequestError(response.status, apiError)
   }
 

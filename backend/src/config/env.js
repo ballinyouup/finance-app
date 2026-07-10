@@ -14,5 +14,6 @@ export const env = {
   CORS_ORIGIN:
     process.env.CORS_ORIGIN ||
     `${frontendUrl},http://localhost:5173,http://127.0.0.1:5173`,
-  PORT: Number(process.env.PORT || 5000)
+  HOST: process.env.HOST || "0.0.0.0",
+  PORT: Number(process.env.PORT || 5050)
 };

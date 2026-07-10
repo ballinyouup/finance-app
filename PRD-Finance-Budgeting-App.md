@@ -194,7 +194,7 @@ JWT_EXPIRES_IN=1h
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=MoneySim <no-reply@moneysim.app>
 FRONTEND_URL=http://localhost:5173
-PORT=5000
+PORT=5050
 ```
 
 ---

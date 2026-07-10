@@ -34,7 +34,8 @@ RESEND_API_KEY=
 RESEND_FROM_EMAIL=MoneySim <no-reply@moneysim.app>
 FRONTEND_URL=http://localhost:5173
 CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173,https://moneysim.app
-PORT=5000
+HOST=127.0.0.1
+PORT=5050
 ```
 
 Use `MoneySim <no-reply@moneysim.app>` for transactional verification emails after `moneysim.app` is verified in Resend. If `RESEND_API_KEY` is empty, verification links are printed to the backend console for local development.
@@ -47,13 +48,13 @@ npm install
 npm run dev
 ```
 
-The frontend defaults to `http://127.0.0.1:5000/api` when opened from localhost, to `http://<current-host>:5000/api` when opened from a non-local host in dev mode, and to `/api` in production builds. To override it:
+The frontend defaults to `http://127.0.0.1:5050/api` when opened from localhost, to `http://<current-host>:5050/api` when opened from a non-local host in dev mode, and to `/api` in production builds. To override it:
 
 ```bash
-VITE_API_URL=http://127.0.0.1:5000/api npm run dev
+VITE_API_URL=http://127.0.0.1:5050/api npm run dev
 ```
 
-For deployment, do not build the frontend with `VITE_API_URL=http://127.0.0.1:5000/api`. Browser requests to `127.0.0.1` go to the visitor's computer, not the server.
+For deployment, do not build the frontend with `VITE_API_URL=http://127.0.0.1:5050/api`. Browser requests to `127.0.0.1` go to the visitor's computer, not the server.
 
 If the backend is reverse-proxied at the same origin, use:
 
@@ -61,10 +62,10 @@ If the backend is reverse-proxied at the same origin, use:
 VITE_API_URL=/api npm run build
 ```
 
-If the backend is directly reachable on port `5000`, use the server host:
+If the backend is directly reachable on port `5050`, use the server host:
 
 ```bash
-VITE_API_URL=http://207.148.15.2:5000/api npm run build
+VITE_API_URL=http://207.148.15.2:5050/api npm run build
 ```
 
 For the production domain later:
@@ -78,6 +79,27 @@ Backend production values should match the deployed frontend:
 ```bash
 FRONTEND_URL=http://207.148.15.2
 CORS_ORIGIN=http://207.148.15.2
+HOST=127.0.0.1
+PORT=5050
+```
+
+## Nginx Reverse Proxy
+
+For production, prefer serving the frontend and API from the same origin:
+
+```bash
+cd frontend
+VITE_API_URL=/api npm run build
+sudo mkdir -p /var/www/moneysim.app
+sudo cp -R dist/* /var/www/moneysim.app/
+```
+
+Then copy one of the sample nginx configs from `deploy/` into `/etc/nginx/sites-available/moneysim.app`, enable it, and reload nginx:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/moneysim.app /etc/nginx/sites-enabled/moneysim.app
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 ## Verification

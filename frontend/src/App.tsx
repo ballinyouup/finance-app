@@ -764,6 +764,8 @@ function DashboardPage({ token }: { token: string }) {
     return <PageSkeleton />
   }
 
+  const missingCatalog = jobs.length === 0 || !hasCatalogOptions(optionsByCategory)
+
   return (
     <div className="grid gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -782,6 +784,16 @@ function DashboardPage({ token }: { token: string }) {
         <Alert variant="destructive">
           <AlertTitle>Action needed</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {missingCatalog ? (
+        <Alert variant="destructive">
+          <AlertTitle>Catalog data missing</AlertTitle>
+          <AlertDescription>
+            Jobs, housing, or transportation options are empty. Restart the backend or run{" "}
+            <code>npm run seed</code> in the backend folder.
+          </AlertDescription>
         </Alert>
       ) : null}
 
@@ -807,6 +819,7 @@ function DashboardPage({ token }: { token: string }) {
         <StartRunPanel
           busy={busy}
           jobs={jobs}
+          disabled={missingCatalog}
           optionsByCategory={optionsByCategory}
           onStart={startRun}
         />
@@ -818,11 +831,13 @@ function DashboardPage({ token }: { token: string }) {
 function StartRunPanel({
   jobs,
   optionsByCategory,
+  disabled,
   busy,
   onStart,
 }: {
   jobs: Job[]
   optionsByCategory: Record<ExpenseCategory, ExpenseOption[]>
+  disabled: boolean
   busy: boolean
   onStart: (
     lifePath: LifePath,
@@ -887,13 +902,14 @@ function StartRunPanel({
         <ExpensePickerGrid
           optionsByCategory={optionsByCategory}
           selections={selections}
+          disabled={disabled}
           onChange={(category, optionId) =>
             setSelections((current) => ({ ...current, [category]: optionId }))
           }
         />
         <Button
           className="w-fit"
-          disabled={busy || !jobId || !hasAllSelections(selections)}
+          disabled={disabled || busy || !jobId || !hasAllSelections(selections)}
           onClick={() => onStart(lifePath, jobId, selections)}
         >
           <Play className="size-4" aria-hidden="true" />
@@ -1529,6 +1545,12 @@ function defaultSelections(
 
 function hasAllSelections(selections: ExpenseSelections) {
   return monthlyCategories.every((category) => selections[category])
+}
+
+function hasCatalogOptions(
+  optionsByCategory: Record<ExpenseCategory, ExpenseOption[]>,
+) {
+  return monthlyCategories.every((category) => optionsByCategory[category].length > 0)
 }
 
 function selectedIds(session: GameSession) {

@@ -7,6 +7,7 @@ import { jobRouter } from "./routes/job.routes.js";
 import { leaderboardRouter } from "./routes/leaderboard.routes.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 import { env } from "./config/env.js";
+import { logger } from "./utils/logger.js";
 import { sendSuccess } from "./utils/response.js";
 
 export const app = express();
@@ -25,11 +26,39 @@ app.use(
         return;
       }
 
+      logger.warn("CORS origin rejected", { origin });
       callback(new Error(`CORS origin not allowed: ${origin}`));
     }
   })
 );
 app.use(express.json());
+
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+
+  if (req.path.startsWith("/api")) {
+    logger.info("API request started", {
+      method: req.method,
+      path: req.originalUrl,
+      origin: req.get("origin") || null
+    });
+  }
+
+  res.on("finish", () => {
+    if (!req.path.startsWith("/api")) {
+      return;
+    }
+
+    logger.info("API request finished", {
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs: Date.now() - startedAt
+    });
+  });
+
+  next();
+});
 
 app.get("/", (req, res) => {
   sendSuccess(res, { message: "MoneySim API is running", status: "ok" });
