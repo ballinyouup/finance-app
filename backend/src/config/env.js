@@ -3,6 +3,17 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+const defaultCorsOrigins = [
+  frontendUrl,
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "https://moneysim.app",
+  "https://www.moneysim.app"
+];
+const configuredCorsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean)
+  : [];
+const corsOrigins = [...new Set([...configuredCorsOrigins, ...defaultCorsOrigins])].join(",");
 
 export const env = {
   MONGO_URI: process.env.MONGO_URI || "mongodb://127.0.0.1:27017/finance_app",
@@ -11,9 +22,7 @@ export const env = {
   RESEND_API_KEY: process.env.RESEND_API_KEY || "",
   RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL || "MoneySim <no-reply@moneysim.app>",
   FRONTEND_URL: frontendUrl,
-  CORS_ORIGIN:
-    process.env.CORS_ORIGIN ||
-    `${frontendUrl},http://localhost:5173,http://127.0.0.1:5173`,
+  CORS_ORIGIN: corsOrigins,
   HOST: process.env.HOST || "0.0.0.0",
   PORT: Number(process.env.PORT || 5050)
 };

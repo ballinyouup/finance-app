@@ -63,6 +63,16 @@ async function lowExpenseSelections() {
 }
 
 describe("auth routes", () => {
+  it("allows the production domain through CORS", async () => {
+    const response = await request(app)
+      .options("/api/auth/login")
+      .set("Origin", "https://moneysim.app")
+      .set("Access-Control-Request-Method", "POST");
+
+    expect(response.status).toBe(204);
+    expect(response.headers["access-control-allow-origin"]).toBe("https://moneysim.app");
+  });
+
   it("creates an unverified account and blocks login until verification", async () => {
     const signup = await request(app).post("/api/auth/signup").send({
       name: "New Player",

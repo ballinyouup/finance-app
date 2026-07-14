@@ -33,7 +33,7 @@ JWT_EXPIRES_IN=1h
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=MoneySim <no-reply@moneysim.app>
 FRONTEND_URL=http://localhost:5173
-CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173,https://moneysim.app
+CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173,https://moneysim.app,https://www.moneysim.app
 HOST=127.0.0.1
 PORT=5050
 ```
@@ -62,13 +62,7 @@ If the backend is reverse-proxied at the same origin, use:
 VITE_API_URL=/api npm run build
 ```
 
-If the backend is directly reachable on port `5050`, use the server host:
-
-```bash
-VITE_API_URL=http://207.148.15.2:5050/api npm run build
-```
-
-For the production domain later:
+If the backend is directly reachable on port `5050`, use the domain:
 
 ```bash
 VITE_API_URL=https://api.moneysim.app/api npm run build
@@ -77,8 +71,8 @@ VITE_API_URL=https://api.moneysim.app/api npm run build
 Backend production values should match the deployed frontend:
 
 ```bash
-FRONTEND_URL=http://207.148.15.2
-CORS_ORIGIN=http://207.148.15.2
+FRONTEND_URL=https://moneysim.app
+CORS_ORIGIN=https://moneysim.app,https://www.moneysim.app
 HOST=127.0.0.1
 PORT=5050
 ```
