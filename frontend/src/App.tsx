@@ -16,16 +16,20 @@ import {
   useSearchParams,
 } from "react-router-dom"
 import {
+  Activity,
   ArrowRight,
   Banknote,
+  BatteryCharging,
   BriefcaseBusiness,
   ChartNoAxesColumnIncreasing,
   CircleDollarSign,
+  Heart,
   LogOut,
   Medal,
   Play,
   RefreshCw,
   Trophy,
+  Utensils,
   WalletCards,
 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -80,6 +84,7 @@ import {
   type Job,
   type LeaderboardEntry,
   type LifePath,
+  type Major,
   type MonthlyChoices,
   type MonthlyExpenseCategory,
   type User,
@@ -91,6 +96,9 @@ const startingMonthlyChoices: MonthlyChoices = {
   foodDays: 20,
   entertainmentDays: 4,
   datingDays: 2,
+  activity: "rest",
+  internship: false,
+  debtPayment: 0,
 }
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -175,7 +183,7 @@ function App() {
     <BrowserRouter>
       <div className="min-h-svh bg-[radial-gradient(circle_at_top_left,var(--brand-soft),transparent_30rem),linear-gradient(180deg,var(--background),var(--surface))] text-foreground">
         <Shell user={user} onLogout={handleLogout} />
-        <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <main className="app-main mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
           {authLoading ? (
             <PageSkeleton />
           ) : (
@@ -220,7 +228,7 @@ function Shell({
   onLogout: () => void
 }) {
   return (
-    <header className="border-b bg-background/85 backdrop-blur">
+    <header className="app-header border-b bg-background/85 backdrop-blur">
       <nav className="mx-auto flex min-h-14 w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <Link className="flex items-center gap-2 font-semibold" to="/">
           <span className="flex size-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
@@ -691,12 +699,13 @@ function DashboardPage({ token }: { token: string }) {
     lifePath: LifePath,
     jobId: string,
     expenseSelections: ExpenseSelections,
+    major?: Major,
   ) {
     setBusy(true)
     setError(null)
 
     try {
-      const data = await api.startSession(token, { lifePath, jobId, expenseSelections })
+      const data = await api.startSession(token, { lifePath, major, jobId, expenseSelections })
       setSession(data.session)
       setDeadSession(null)
     } catch (startError) {
@@ -760,6 +769,32 @@ function DashboardPage({ token }: { token: string }) {
     }
   }
 
+  async function buyHome() {
+    setBusy(true)
+    setError(null)
+    try {
+      const data = await api.buyHome(token)
+      setSession(data.session)
+    } catch (buyError) {
+      setError(getErrorMessage(buyError))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function enrollCollege(major: Major) {
+    setBusy(true)
+    setError(null)
+    try {
+      const data = await api.enrollCollege(token, major)
+      setSession(data.session)
+    } catch (enrollError) {
+      setError(getErrorMessage(enrollError))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (loading) {
     return <PageSkeleton />
   }
@@ -812,6 +847,8 @@ function DashboardPage({ token }: { token: string }) {
           optionsByCategory={optionsByCategory}
           session={session}
           onAdvance={advanceMonths}
+          onBuyHome={buyHome}
+          onEnrollCollege={enrollCollege}
           onChangeExpense={updateExpense}
           onChangeJob={updateJob}
         />
@@ -843,23 +880,37 @@ function StartRunPanel({
     lifePath: LifePath,
     jobId: string,
     expenseSelections: ExpenseSelections,
+    major?: Major,
   ) => void
 }) {
   const [lifePath, setLifePath] = useState<LifePath>("work")
+  const [major, setMajor] = useState<Major>("business")
+  const [tutorialOpen, setTutorialOpen] = useState(false)
+  const [tutorialStep, setTutorialStep] = useState(0)
   const [jobId, setJobId] = useState(() => jobs[0]?._id ?? "")
   const [selections, setSelections] = useState<ExpenseSelections>(() =>
     defaultSelections(optionsByCategory),
   )
+  const availableJobs = useMemo(
+    () => jobs.filter((job) => lifePath !== "college" || !job.requiresDegree),
+    [jobs, lifePath],
+  )
 
   useEffect(() => {
-    if (!jobId && jobs[0]) {
-      setJobId(jobs[0]._id)
+    if (!availableJobs.some((job) => job._id === jobId) && availableJobs[0]) {
+      setJobId(availableJobs[0]._id)
     }
-  }, [jobId, jobs])
+  }, [availableJobs, jobId])
 
   useEffect(() => {
     setSelections((current) => ({ ...defaultSelections(optionsByCategory), ...current }))
   }, [optionsByCategory])
+
+  function beginRun() {
+    onStart(lifePath, jobId, selections, lifePath === "college" ? major : undefined)
+    setTutorialOpen(false)
+    setTutorialStep(0)
+  }
 
   return (
     <Card>
@@ -895,9 +946,36 @@ function StartRunPanel({
             </SelectContent>
           </Select>
         </div>
+        {lifePath === "college" ? (
+          <div className="grid gap-2">
+            <Label>College major</Label>
+            <Select
+              items={[
+                { label: "Computer Science", value: "computer-science" },
+                { label: "Business", value: "business" },
+                { label: "Communications", value: "communications" },
+              ]}
+              value={major}
+              onValueChange={(value) => value && setMajor(value as Major)}
+            >
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectGroup>
+                <SelectItem value="computer-science">Computer Science</SelectItem>
+                <SelectItem value="business">Business</SelectItem>
+                <SelectItem value="communications">Communications</SelectItem>
+              </SelectGroup></SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">Studying and internships build the skill tied to your major.</p>
+          </div>
+        ) : null}
         <div className="grid gap-2">
           <Label>{lifePath === "college" ? "Part-time job while enrolled" : "Starting job"}</Label>
-          <JobSelect jobs={jobs} value={jobId} onValueChange={setJobId} />
+          <JobSelect jobs={availableJobs} value={jobId} onValueChange={setJobId} />
+          {lifePath === "college" ? (
+            <p className="text-sm text-muted-foreground">
+              Degree-required careers unlock after you graduate in 48 months.
+            </p>
+          ) : null}
         </div>
         <ExpensePickerGrid
           optionsByCategory={optionsByCategory}
@@ -910,11 +988,46 @@ function StartRunPanel({
         <Button
           className="w-fit"
           disabled={disabled || busy || !jobId || !hasAllSelections(selections)}
-          onClick={() => onStart(lifePath, jobId, selections)}
+          onClick={() => setTutorialOpen(true)}
         >
           <Play className="size-4" aria-hidden="true" />
           {busy ? "Starting..." : "Start Simulation"}
         </Button>
+        <Dialog open={tutorialOpen} onOpenChange={setTutorialOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Welcome to your new life</DialogTitle>
+              <DialogDescription>
+                {tutorialStep === 0
+                  ? "Each turn is one month. Earn income, cover your costs, and keep your needs healthy."
+                  : tutorialStep === 1
+                    ? "Choose a focus activity each month. Study grows skills, while exercise, recreation, and rest protect your wellbeing and energy."
+                    : tutorialStep === 2
+                      ? "College adds tuition and debt, but majors, internships, graduation, and skills unlock stronger career paths."
+                      : "Set goals as you go: save money, pay off debt, build a career, and buy a home. Events and your choices shape the outcome."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-1" aria-label={`Tutorial step ${tutorialStep + 1} of 4`}>
+              {[0, 1, 2, 3].map((step) => (
+                <span
+                  key={step}
+                  className={`h-1 flex-1 rounded-full ${step <= tutorialStep ? "bg-primary" : "bg-muted"}`}
+                />
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={beginRun}>Skip tutorial & start</Button>
+              {tutorialStep > 0 ? (
+                <Button variant="outline" onClick={() => setTutorialStep((step) => step - 1)}>Previous</Button>
+              ) : null}
+              {tutorialStep < 3 ? (
+                <Button onClick={() => setTutorialStep((step) => step + 1)}>Next</Button>
+              ) : (
+                <Button onClick={beginRun}>Start your run</Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   )
@@ -928,6 +1041,8 @@ function ActiveSession({
   onAdvance,
   onChangeJob,
   onChangeExpense,
+  onBuyHome,
+  onEnrollCollege,
 }: {
   session: GameSession
   jobs: Job[]
@@ -936,10 +1051,12 @@ function ActiveSession({
   onAdvance: (months: number, choices: MonthlyChoices) => void
   onChangeJob: (jobId: string) => void
   onChangeExpense: (category: MonthlyExpenseCategory, optionId: string) => void
+  onBuyHome: () => void
+  onEnrollCollege: (major: Major) => void
 }) {
   const expenseTotal = sumSelectedExpenses(session)
   const [choices, setChoices] = useState<MonthlyChoices>(
-    session.monthlyChoices ?? startingMonthlyChoices,
+    { ...startingMonthlyChoices, ...session.monthlyChoices },
   )
   const lastHistory = session.history.at(-1)
   const ageYears = Math.floor(session.ageMonths / 12)
@@ -965,25 +1082,6 @@ function ActiveSession({
         />
       </section>
 
-      <section className="grid gap-4 md:grid-cols-4">
-        <NeedCard label="Happiness" value={session.needs.happiness} />
-        <NeedCard label="Hunger" value={session.needs.hunger} />
-        <NeedCard label="Entertainment" value={session.needs.entertainment} />
-        <NeedCard label="Love" value={session.needs.love} />
-      </section>
-
-      {lastHistory?.eventTitle ? (
-        <Alert>
-          <AlertTitle>Last month’s event</AlertTitle>
-          <AlertDescription>
-            {lastHistory.eventTitle}
-            {lastHistory.eventAmount
-              ? ` (${lastHistory.eventAmount > 0 ? "+" : ""}${money(lastHistory.eventAmount)})`
-              : ""}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
       <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
         <Card>
           <CardHeader>
@@ -997,7 +1095,11 @@ function ActiveSession({
           <CardContent>
             <ChangeJobDialog
               busy={busy}
-              jobs={jobs}
+              jobs={jobs.filter(
+                (job) =>
+                  !job.requiresDegree ||
+                  (session.lifePath === "college" && session.educationMonths >= 48),
+              )}
               value={session.currentJobId._id}
               onChangeJob={onChangeJob}
             />
@@ -1022,7 +1124,91 @@ function ActiveSession({
         </Card>
       </div>
 
+      <section className="grid gap-4 md:grid-cols-3">
+        <StatCard
+          label="Career"
+          value={`${session.currentJobId.careerTrack} · Level ${session.careerLevel ?? 0}`}
+          note={session.unemployedMonths ? "Between jobs this month" : `${session.careerPerformance ?? 0}/100 toward promotion`}
+        />
+        <StatCard
+          label="Skills"
+          value={`Tech ${session.skills?.technical ?? 0} · Business ${session.skills?.business ?? 0}`}
+          note={`Communication ${session.skills?.communication ?? 0}/10`}
+        />
+        <StatCard
+          label="Home"
+          value={session.homeOwned ? "Homeowner" : "Renting"}
+          note={session.homeOwned ? "Home goal complete" : "Save $30,000 to buy"}
+        />
+      </section>
+
+      <MonthForecast
+        session={session}
+        fixedExpenses={expenseTotal}
+        variableExpenses={projectedVariable}
+        debtPayment={choices.debtPayment}
+      />
+
       <Card>
+        <CardHeader>
+          <CardTitle>Education</CardTitle>
+          <CardDescription>
+            {session.lifePath === "college"
+              ? `${session.major?.replace("-", " ") ?? "College"} · ${session.educationMonths}/48 months completed`
+              : "Enroll at any time to build new skills and unlock degree-required careers."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {session.lifePath === "college" ? (
+            <Badge variant={session.educationMonths >= 48 ? "default" : "secondary"}>
+              {session.educationMonths >= 48 ? "Graduated" : `${48 - session.educationMonths} months to graduation`}
+            </Badge>
+          ) : (
+            <EnrollCollegeDialog busy={busy} onEnroll={onEnrollCollege} />
+          )}
+        </CardContent>
+      </Card>
+
+      {lastHistory?.eventTitle ? (
+        <Alert>
+          <AlertTitle>Last month’s event</AlertTitle>
+          <AlertDescription>
+            {lastHistory.eventTitle}
+            {lastHistory.eventAmount
+              ? ` (${lastHistory.eventAmount > 0 ? "+" : ""}${money(lastHistory.eventAmount)})`
+              : ""}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Goals</CardTitle>
+          <CardDescription>Build a life you are proud of. Completed goals improve your final score.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {["Save $10,000", "Graduate debt-free", "Reach age 40", "Buy a home"].map((goal) => (
+            <Badge key={goal} variant={session.completedGoals?.includes(goal) ? "default" : "secondary"}>
+              {session.completedGoals?.includes(goal) ? "✓ " : "○ "}{goal}
+            </Badge>
+          ))}
+          {!session.homeOwned ? (
+            <Button variant="outline" disabled={busy || session.balance < 30000} onClick={onBuyHome}>
+              Buy Home ({money(30000)})
+            </Button>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-4 md:grid-cols-5">
+        <NeedCard label="Happiness" value={session.needs.happiness} />
+        <NeedCard label="Hunger" value={session.needs.hunger} />
+        <NeedCard label="Entertainment" value={session.needs.entertainment} />
+        <NeedCard label="Love" value={session.needs.love} />
+        <NeedCard label="Energy" value={session.needs.energy ?? 70} />
+      </section>
+
+      <Card className="border-primary/40 shadow-sm">
         <CardHeader>
           <CardTitle>Monthly plan</CardTitle>
           <CardDescription>
@@ -1030,6 +1216,53 @@ function ActiveSession({
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
+          <div className="grid gap-2">
+            <Label>Focus activity</Label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {([
+                ["study", "Study"],
+                ["exercise", "Exercise"],
+                ["recreation", "Recreation"],
+                ["rest", "Rest"],
+              ] as const).map(([activity, label]) => (
+                <Button
+                  key={activity}
+                  type="button"
+                  variant={choices.activity === activity ? "default" : "outline"}
+                  disabled={busy}
+                  onClick={() => setChoices((current) => ({ ...current, activity }))}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Choose one activity for the month. It changes your energy and wellbeing when you advance.
+            </p>
+          </div>
+          {session.lifePath === "college" && session.educationMonths < 48 ? (
+            <Button
+              type="button"
+              variant={choices.internship ? "default" : "outline"}
+              disabled={busy}
+              onClick={() => setChoices((current) => ({ ...current, internship: !current.internship }))}
+            >
+              {choices.internship ? "Internship selected (+$550, major skill)" : "Take an internship (+$550, major skill)"}
+            </Button>
+          ) : null}
+          {session.studentDebt > 0 ? (
+            <div className="grid gap-2">
+              <Label htmlFor="debt-payment">Student-loan payment this month</Label>
+              <Input
+                id="debt-payment"
+                type="number"
+                min={0}
+                max={2000}
+                value={choices.debtPayment}
+                onChange={(event) => setChoices((current) => ({ ...current, debtPayment: Math.max(0, Math.min(2000, Number(event.target.value) || 0)) }))}
+              />
+            </div>
+          ) : null}
           <div className="grid gap-4 md:grid-cols-3">
             <MonthlyChoiceInput
               label="Days eating"
@@ -1074,8 +1307,67 @@ function ActiveSession({
         </CardContent>
       </Card>
 
+      <NextSteps session={session} jobs={jobs} />
+
       <HistoryTable session={session} />
     </div>
+  )
+}
+
+function MonthForecast({
+  session,
+  fixedExpenses,
+  variableExpenses,
+  debtPayment,
+}: {
+  session: GameSession
+  fixedExpenses: number
+  variableExpenses: number
+  debtPayment: number
+}) {
+  const enrolled = session.lifePath === "college" && session.educationMonths < 48
+  const graduated = session.lifePath === "college" && session.educationMonths >= 48
+  const income = session.unemployedMonths
+    ? 0
+    : session.currentJobId.monthlySalary * (1 + (session.careerLevel ?? 0) * 0.12) * (enrolled ? 0.35 : graduated ? 1.55 : 1)
+  const expenses = fixedExpenses + variableExpenses + debtPayment
+  const projectedChange = income - expenses
+
+  return (
+    <Card className="border-emerald-700/20 bg-emerald-50/35">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><CircleDollarSign className="size-5" /> This month</CardTitle>
+        <CardDescription>Review the forecast before you advance.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 sm:grid-cols-4">
+        <ForecastItem label="Income" value={money(income)} tone="text-emerald-700" />
+        <ForecastItem label="Planned spending" value={money(expenses)} tone="text-amber-700" />
+        <ForecastItem label="Projected change" value={`${projectedChange >= 0 ? "+" : ""}${money(projectedChange)}`} tone={projectedChange >= 0 ? "text-emerald-700" : "text-red-700"} />
+        <ForecastItem label="Balance after" value={money(session.balance + projectedChange)} tone="text-foreground" />
+      </CardContent>
+    </Card>
+  )
+}
+
+function ForecastItem({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return <div className="rounded-lg border bg-background px-3 py-2"><p className="text-xs text-muted-foreground">{label}</p><p className={`font-semibold ${tone}`}>{value}</p></div>
+}
+
+function NextSteps({ session, jobs }: { session: GameSession; jobs: Job[] }) {
+  const tips = getGameTips(session, jobs)
+
+  return (
+    <Card className="border-primary/20">
+      <CardHeader>
+        <CardTitle>Next steps</CardTitle>
+        <CardDescription>Personalized suggestions based on your current life.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="grid gap-2 text-sm">
+          {tips.map((tip) => <li key={tip} className="rounded-md bg-muted px-3 py-2">{tip}</li>)}
+        </ul>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -1151,7 +1443,7 @@ function ChangeJobDialog({
         <DialogHeader>
           <DialogTitle>Change job</DialogTitle>
           <DialogDescription>
-            Pick any role in the catalog before advancing the month.
+            Degree-required roles unlock after graduating from college.
           </DialogDescription>
         </DialogHeader>
         <JobSelect jobs={jobs} value={draft} onValueChange={setDraft} />
@@ -1164,6 +1456,55 @@ function ChangeJobDialog({
             }}
           >
             Confirm Job
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EnrollCollegeDialog({ busy, onEnroll }: { busy: boolean; onEnroll: (major: Major) => void }) {
+  const [open, setOpen] = useState(false)
+  const [major, setMajor] = useState<Major>("business")
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button variant="outline" />}>Enroll in college</DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Start college</DialogTitle>
+          <DialogDescription>
+            College takes 48 months. Tuition adds student debt, but studying and internships build career skills.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          <Label>Major</Label>
+          <Select
+            items={[
+              { label: "Computer Science", value: "computer-science" },
+              { label: "Business", value: "business" },
+              { label: "Communications", value: "communications" },
+            ]}
+            value={major}
+            onValueChange={(value) => value && setMajor(value as Major)}
+          >
+            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectGroup>
+              <SelectItem value="computer-science">Computer Science</SelectItem>
+              <SelectItem value="business">Business</SelectItem>
+              <SelectItem value="communications">Communications</SelectItem>
+            </SelectGroup></SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button
+            disabled={busy}
+            onClick={() => {
+              onEnroll(major)
+              setOpen(false)
+            }}
+          >
+            Enroll now
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1264,11 +1605,19 @@ function HistoryTable({ session }: { session: GameSession }) {
     <Card>
       <CardHeader>
         <CardTitle>History</CardTitle>
-        <CardDescription>Most recent months in this life.</CardDescription>
+        <CardDescription>Life timeline and recent months.</CardDescription>
       </CardHeader>
       <CardContent>
         {session.history.length ? (
-          <Table>
+          <>
+          <div className="mb-4 flex flex-wrap gap-2">
+            {session.history.filter((round) => round.eventTitle).slice(-6).map((round) => (
+              <Badge key={`${round.month}-${round.eventTitle}`} variant="secondary">Month {round.month}: {round.eventTitle}</Badge>
+            ))}
+          </div>
+          <details>
+            <summary className="cursor-pointer text-sm font-medium text-muted-foreground">Show month-by-month history</summary>
+            <div className="mt-4 overflow-x-auto"><Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Month</TableHead>
@@ -1297,7 +1646,9 @@ function HistoryTable({ session }: { session: GameSession }) {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+            </Table></div>
+          </details>
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">
             No months advanced yet.
@@ -1448,18 +1799,72 @@ function StatCard({
   )
 }
 
+function getGameTips(session: GameSession, jobs: Job[]) {
+  const tips: string[] = []
+  const needs = [
+    ["Hunger", session.needs.hunger, "Increase your days eating before your hunger becomes dangerous."],
+    ["Energy", session.needs.energy ?? 70, "Choose Rest this month to rebuild energy and reduce risk."],
+    ["Happiness", session.needs.happiness, "Make room for recreation or connection to lift happiness."],
+    ["Entertainment", session.needs.entertainment, "Plan a little recreation to keep entertainment from falling further."],
+    ["Love", session.needs.love, "Spend time dating or connecting to strengthen your relationships."],
+  ] as const
+
+  for (const [label, value, tip] of needs) {
+    if (value < 25) tips.push(`Critical ${label.toLowerCase()}: ${tip}`)
+  }
+
+  if (session.unemployedMonths) {
+    tips.push("You are between jobs this month. Keep costs low and choose a new role when you meet its requirements.")
+  }
+
+  if ((session.careerPerformance ?? 0) >= 75 && (session.careerLevel ?? 0) < 3) {
+    tips.push(`Career milestone: only ${100 - (session.careerPerformance ?? 0)} performance remains until your next promotion.`)
+  }
+
+  const nextJob = jobs
+    .filter((job) => job.tier > session.currentJobId.tier)
+    .find((job) => (session.skills?.[job.requiredSkill] ?? 0) < job.requiredSkillLevel)
+  if (nextJob) {
+    const currentSkill = session.skills?.[nextJob.requiredSkill] ?? 0
+    tips.push(`Skill milestone: ${nextJob.title} needs ${nextJob.requiredSkillLevel} ${nextJob.requiredSkill} skill; you need ${Math.ceil(nextJob.requiredSkillLevel - currentSkill)} more.`)
+  }
+
+  if (!session.completedGoals?.includes("Save $10,000") && session.balance >= 7000) {
+    tips.push(`Savings milestone: you are ${money(10000 - session.balance)} away from saving $10,000.`)
+  }
+  if (!session.homeOwned && session.balance >= 20000) {
+    tips.push(`Home milestone: you are ${money(30000 - session.balance)} away from buying a home.`)
+  }
+  if (session.studentDebt > 0 && session.studentDebt <= 5000) {
+    tips.push(`Debt milestone: only ${money(session.studentDebt)} remains. A focused loan payment can get you debt-free.`)
+  }
+  if (session.lifePath === "college" && session.educationMonths < 48) {
+    tips.push(`Education milestone: ${48 - session.educationMonths} college months remain. Studying and internships build your ${session.major?.replace("-", " ") ?? "major"} skills.`)
+  }
+
+  return tips.length ? tips.slice(0, 4) : ["You are in a stable spot. Keep building skills, saving cash, and protecting your wellbeing."]
+}
+
 function NeedCard({ label, value }: { label: string; value: number }) {
   const rounded = Math.round(value)
   const status = rounded < 25 ? "Critical" : rounded < 50 ? "Strained" : "Stable"
+  const NeedIcon = {
+    Happiness: Heart,
+    Hunger: Utensils,
+    Entertainment: Activity,
+    Love: Heart,
+    Energy: BatteryCharging,
+  }[label] ?? Activity
+  const barColor = rounded < 25 ? "bg-red-500" : rounded < 50 ? "bg-amber-500" : "bg-emerald-600"
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
-        <CardDescription>{label}</CardDescription>
+        <CardDescription className="flex items-center gap-2"><NeedIcon className="size-4" />{label}</CardDescription>
         <CardTitle className="text-2xl">{rounded}</CardTitle>
         <div className="h-2 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full bg-emerald-700"
+            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
             style={{ width: `${Math.max(0, Math.min(100, rounded))}%` }}
           />
         </div>

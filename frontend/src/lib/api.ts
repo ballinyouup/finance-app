@@ -30,6 +30,10 @@ export type Job = {
   title: string
   monthlySalary: number
   tier: number
+  requiresDegree: boolean
+  careerTrack: string
+  requiredSkill: SkillName
+  requiredSkillLevel: number
 }
 
 export type ExpenseCategory =
@@ -54,12 +58,19 @@ export type NeedScores = {
   hunger: number
   entertainment: number
   love: number
+  energy: number
 }
 export type LifePath = "work" | "college"
+export type Major = "computer-science" | "business" | "communications"
+export type SkillName = "technical" | "business" | "communication"
+export type Skills = Record<SkillName, number>
 export type MonthlyChoices = {
   foodDays: number
   entertainmentDays: number
   datingDays: number
+  activity: "study" | "exercise" | "recreation" | "rest"
+  internship: boolean
+  debtPayment: number
 }
 
 export type RoundHistory = {
@@ -87,6 +98,13 @@ export type GameSession = {
   balance: number
   studentDebt: number
   educationMonths: number
+  major?: Major
+  skills: Skills
+  careerLevel: number
+  careerPerformance: number
+  unemployedMonths: number
+  completedGoals: string[]
+  homeOwned: boolean
   needs: NeedScores
   monthlyChoices: MonthlyChoices
   currentJobId: Job
@@ -252,7 +270,7 @@ export const api = {
     apiRequest<{ session: GameSession | null }>("/game/current", { token }),
   startSession: (
     token: string,
-    payload: { lifePath: LifePath; jobId: string; expenseSelections: ExpenseSelections },
+    payload: { lifePath: LifePath; major?: Major; jobId: string; expenseSelections: ExpenseSelections },
   ) =>
     apiRequest<{ session: GameSession }>("/game/start", {
       method: "POST",
@@ -274,12 +292,20 @@ export const api = {
       token,
       body: JSON.stringify(payload),
     }),
+  enrollCollege: (token: string, major: Major) =>
+    apiRequest<{ session: GameSession }>("/game/enroll-college", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ major }),
+    }),
   advanceMonths: (token: string, months: number, choices: Partial<MonthlyChoices>) =>
     apiRequest<{ session: GameSession }>("/game/advance", {
       method: "POST",
       token,
       body: JSON.stringify({ months, choices }),
     }),
+  buyHome: (token: string) =>
+    apiRequest<{ session: GameSession }>("/game/buy-home", { method: "POST", token }),
   leaderboard: (limit = 20) =>
     apiRequest<{ entries: LeaderboardEntry[] }>(`/leaderboard?limit=${limit}`),
 }
