@@ -11,13 +11,23 @@ const needsSchema = {
   happiness: { type: Number, default: STARTING_NEEDS.happiness, min: 0, max: 100 },
   hunger: { type: Number, default: STARTING_NEEDS.hunger, min: 0, max: 100 },
   entertainment: { type: Number, default: STARTING_NEEDS.entertainment, min: 0, max: 100 },
-  love: { type: Number, default: STARTING_NEEDS.love, min: 0, max: 100 }
+  love: { type: Number, default: STARTING_NEEDS.love, min: 0, max: 100 },
+  energy: { type: Number, default: STARTING_NEEDS.energy, min: 0, max: 100 }
 };
 
 const monthlyChoicesSchema = {
   foodDays: { type: Number, default: 20, min: 0, max: 30 },
   entertainmentDays: { type: Number, default: 4, min: 0, max: 30 },
-  datingDays: { type: Number, default: 2, min: 0, max: 30 }
+  datingDays: { type: Number, default: 2, min: 0, max: 30 },
+  activity: { type: String, enum: ["study", "exercise", "recreation", "rest"], default: "rest" },
+  internship: { type: Boolean, default: false },
+  debtPayment: { type: Number, default: 0, min: 0, max: 2000 }
+};
+
+const skillsSchema = {
+  technical: { type: Number, default: 0, min: 0, max: 10 },
+  business: { type: Number, default: 0, min: 0, max: 10 },
+  communication: { type: Number, default: 0, min: 0, max: 10 }
 };
 
 const historySchema = new mongoose.Schema(
@@ -57,6 +67,13 @@ const gameSessionSchema = new mongoose.Schema(
     balance: { type: Number, default: STARTING_BALANCE },
     studentDebt: { type: Number, default: 0, min: 0 },
     educationMonths: { type: Number, default: 0, min: 0 },
+    major: { type: String, enum: ["computer-science", "business", "communications"] },
+    skills: { type: skillsSchema, default: () => ({}) },
+    careerLevel: { type: Number, default: 0, min: 0, max: 3 },
+    careerPerformance: { type: Number, default: 0, min: 0 },
+    unemployedMonths: { type: Number, default: 0, min: 0 },
+    completedGoals: { type: [String], default: [] },
+    homeOwned: { type: Boolean, default: false },
     needs: needsSchema,
     monthlyChoices: monthlyChoicesSchema,
     currentJobId: { type: mongoose.Schema.Types.ObjectId, ref: "Job", required: true },

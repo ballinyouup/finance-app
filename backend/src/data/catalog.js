@@ -16,23 +16,26 @@ export const STARTING_NEEDS = {
   happiness: 70,
   hunger: 70,
   entertainment: 70,
-  love: 50
+  love: 50,
+  energy: 70
 };
 
 export const LIFE_PATHS = ["work", "college"];
+export const MAJORS = ["computer-science", "business", "communications"];
 
 export const MONTHLY_CHOICE_LIMITS = {
   foodDays: { min: 0, max: DAYS_PER_MONTH },
   entertainmentDays: { min: 0, max: DAYS_PER_MONTH },
   datingDays: { min: 0, max: DAYS_PER_MONTH }
 };
+export const ACTIVITIES = ["study", "exercise", "recreation", "rest"];
 
 export const jobsSeed = [
-  { title: "Barista", monthlySalary: 1800, tier: 1 },
-  { title: "Retail Associate", monthlySalary: 2200, tier: 1 },
-  { title: "Office Admin", monthlySalary: 3000, tier: 2 },
-  { title: "Marketing Coordinator", monthlySalary: 4000, tier: 3 },
-  { title: "Software Developer", monthlySalary: 6500, tier: 4 }
+  { title: "Barista", monthlySalary: 1800, tier: 1, careerTrack: "Service", requiredSkill: "communication", requiredSkillLevel: 0 },
+  { title: "Retail Associate", monthlySalary: 2200, tier: 1, careerTrack: "Service", requiredSkill: "communication", requiredSkillLevel: 1 },
+  { title: "Office Admin", monthlySalary: 3000, tier: 2, careerTrack: "Business", requiredSkill: "business", requiredSkillLevel: 2 },
+  { title: "Marketing Coordinator", monthlySalary: 4000, tier: 3, careerTrack: "Business", requiredSkill: "communication", requiredSkillLevel: 4 },
+  { title: "Software Developer", monthlySalary: 6500, tier: 4, requiresDegree: true, careerTrack: "Technology", requiredSkill: "technical", requiredSkillLevel: 6 }
 ];
 
 export const expenseOptionsSeed = [

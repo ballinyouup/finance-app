@@ -5,8 +5,63 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 0%, oklch(0.94 0.06 165 / 0.45), transparent 26rem),
+    radial-gradient(circle at 94% 18%, oklch(0.94 0.04 235 / 0.35), transparent 24rem),
+    var(--surface);
 }
 
 a {
   text-decoration: none;
+}
+
+.app-header {
+  box-shadow: 0 1px 0 oklch(0.72 0.05 165 / 0.25);
+}
+
+.app-main {
+  animation: page-enter 320ms ease-out;
+}
+
+[data-slot="card"] {
+  border-color: oklch(0.78 0.035 180 / 0.55);
+  box-shadow: 0 10px 28px oklch(0.32 0.05 180 / 0.06);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+[data-slot="card"]:hover {
+  border-color: oklch(0.68 0.09 165 / 0.55);
+  box-shadow: 0 14px 34px oklch(0.32 0.05 180 / 0.1);
+}
+
+[data-slot="button"] {
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+}
+
+[data-slot="button"]:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+details > summary {
+  list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+details > summary::after {
+  content: "+";
+  float: right;
+  font-size: 1.1rem;
+}
+
+details[open] > summary::after {
+  content: "–";
+}
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }

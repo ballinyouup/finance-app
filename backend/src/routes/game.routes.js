@@ -3,6 +3,8 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   LIFE_PATHS,
+  MAJORS,
+  ACTIVITIES,
   MONTHLY_EXPENSE_CATEGORIES,
   MONTHLY_CHOICE_LIMITS,
   STARTING_BALANCE
@@ -27,6 +29,7 @@ const expenseSelectionsSchema = z.object(
 const startSchema = z.object({
   body: z.object({
     lifePath: z.enum(LIFE_PATHS).default("work"),
+    major: z.enum(MAJORS).optional(),
     jobId: objectId,
     expenseSelections: expenseSelectionsSchema
   })
@@ -40,13 +43,19 @@ const expenseSchema = z.object({
     optionId: objectId
   })
 });
+const enrollSchema = z.object({
+  body: z.object({ major: z.enum(MAJORS) })
+});
 const advanceSchema = z.object({
   body: z.object({
     months: z.number().int().min(1).max(12).default(1),
     choices: z.object({
       foodDays: z.number().int().min(MONTHLY_CHOICE_LIMITS.foodDays.min).max(MONTHLY_CHOICE_LIMITS.foodDays.max),
       entertainmentDays: z.number().int().min(MONTHLY_CHOICE_LIMITS.entertainmentDays.min).max(MONTHLY_CHOICE_LIMITS.entertainmentDays.max),
-      datingDays: z.number().int().min(MONTHLY_CHOICE_LIMITS.datingDays.min).max(MONTHLY_CHOICE_LIMITS.datingDays.max)
+      datingDays: z.number().int().min(MONTHLY_CHOICE_LIMITS.datingDays.min).max(MONTHLY_CHOICE_LIMITS.datingDays.max),
+      activity: z.enum(ACTIVITIES),
+      internship: z.boolean(),
+      debtPayment: z.number().int().min(0).max(2000)
     }).partial().default({})
   }).default({ months: 1, choices: {} })
 });
@@ -85,6 +94,27 @@ async function assertJobExists(jobId) {
   return job;
 }
 
+function assertJobAvailable(job, session) {
+  const hasGraduated = session.lifePath === "college" && session.educationMonths >= 48;
+
+  if (job.requiresDegree && !hasGraduated) {
+    throw new ApiError(
+      400,
+      "DEGREE_REQUIRED",
+      `${job.title} requires a degree and unlocks after graduating from college.`
+    );
+  }
+
+  const skillLevel = session.skills?.[job.requiredSkill] ?? 0;
+  if (skillLevel < (job.requiredSkillLevel ?? 0)) {
+    throw new ApiError(
+      400,
+      "SKILL_REQUIRED",
+      `${job.title} requires ${job.requiredSkillLevel} ${job.requiredSkill} skill.`
+    );
+  }
+}
+
 async function getExpenseOptionsBySelection(expenseSelections) {
   const ids = MONTHLY_EXPENSE_CATEGORIES.map((category) => expenseSelections[category]);
   const options = await ExpenseOption.find({ _id: { $in: ids } });
@@ -120,12 +150,14 @@ gameRouter.post("/start", validate(startSchema), async (req, res, next) => {
       throw new ApiError(409, "ACTIVE_SESSION_EXISTS", "You already have an active session.");
     }
 
-    await assertJobExists(req.body.jobId);
+    const job = await assertJobExists(req.body.jobId);
+    assertJobAvailable(job, { lifePath: req.body.lifePath, educationMonths: 0, skills: {} });
     await getExpenseOptionsBySelection(req.body.expenseSelections);
 
     const session = await GameSession.create({
       userId: req.user._id,
       lifePath: req.body.lifePath,
+      major: req.body.lifePath === "college" ? (req.body.major ?? "business") : undefined,
       currentMonth: 1,
       balance: STARTING_BALANCE,
       monthlyChoices: normalizeMonthlyChoices(),
@@ -152,7 +184,8 @@ gameRouter.get("/current", async (req, res, next) => {
 gameRouter.put("/job", validate(jobSchema), async (req, res, next) => {
   try {
     const session = await getActiveSessionOrThrow(req.user._id);
-    await assertJobExists(req.body.jobId);
+    const job = await assertJobExists(req.body.jobId);
+    assertJobAvailable(job, session);
 
     session.currentJobId = req.body.jobId;
     await session.save();
@@ -183,6 +216,25 @@ gameRouter.put("/expenses", validate(expenseSchema), async (req, res, next) => {
   }
 });
 
+gameRouter.post("/enroll-college", validate(enrollSchema), async (req, res, next) => {
+  try {
+    const session = await getActiveSessionOrThrow(req.user._id);
+    if (session.lifePath === "college") {
+      throw new ApiError(409, "ALREADY_ENROLLED", "You are already enrolled in college.");
+    }
+
+    session.lifePath = "college";
+    session.major = req.body.major;
+    session.educationMonths = 0;
+    await session.save();
+
+    const populated = await populateSession(GameSession.findById(session._id));
+    sendSuccess(res, { session: populated });
+  } catch (error) {
+    next(error);
+  }
+});
+
 gameRouter.post("/advance", validate(advanceSchema), async (req, res, next) => {
   try {
     const session = await getActiveSessionOrThrow(req.user._id);
@@ -192,6 +244,22 @@ gameRouter.post("/advance", validate(advanceSchema), async (req, res, next) => {
     applyMonths(session, job, expenseOptions, req.body.choices, req.body.months);
     await session.save();
 
+    const populated = await populateSession(GameSession.findById(session._id));
+    sendSuccess(res, { session: populated });
+  } catch (error) {
+    next(error);
+  }
+});
+gameRouter.post("/buy-home", async (req, res, next) => {
+  try {
+    const session = await getActiveSessionOrThrow(req.user._id);
+    if (session.homeOwned) throw new ApiError(409, "HOME_ALREADY_OWNED", "You already own a home.");
+    if (session.balance < 30000) throw new ApiError(400, "INSUFFICIENT_SAVINGS", "You need $30,000 in savings to buy a home.");
+
+    session.balance -= 30000;
+    session.homeOwned = true;
+    if (!session.completedGoals.includes("Buy a home")) session.completedGoals.push("Buy a home");
+    await session.save();
     const populated = await populateSession(GameSession.findById(session._id));
     sendSuccess(res, { session: populated });
   } catch (error) {

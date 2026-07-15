@@ -179,6 +179,44 @@ describe("catalog and game routes", () => {
     expect(duplicate.body.error.code).toBe("ACTIVE_SESSION_EXISTS");
   });
 
+  it("keeps degree-required jobs locked until a college player graduates", async () => {
+    const user = await createUser();
+    const authorization = await authHeader(user);
+    const developer = await Job.findOne({ title: "Software Developer" });
+    const barista = await Job.findOne({ title: "Barista" });
+    const expenseSelections = await lowExpenseSelections();
+
+    const invalidStart = await request(app)
+      .post("/api/game/start")
+      .set("Authorization", authorization)
+      .send({ lifePath: "college", jobId: developer._id.toString(), expenseSelections });
+    expect(invalidStart.status).toBe(400);
+    expect(invalidStart.body.error.code).toBe("DEGREE_REQUIRED");
+
+    await request(app)
+      .post("/api/game/start")
+      .set("Authorization", authorization)
+      .send({ lifePath: "college", jobId: barista._id.toString(), expenseSelections });
+
+    const lockedChange = await request(app)
+      .put("/api/game/job")
+      .set("Authorization", authorization)
+      .send({ jobId: developer._id.toString() });
+    expect(lockedChange.status).toBe(400);
+    expect(lockedChange.body.error.code).toBe("DEGREE_REQUIRED");
+
+    await GameSession.updateOne(
+      { userId: user._id, status: "active" },
+      { educationMonths: 48, "skills.technical": 6 }
+    );
+    const unlockedChange = await request(app)
+      .put("/api/game/job")
+      .set("Authorization", authorization)
+      .send({ jobId: developer._id.toString() });
+    expect(unlockedChange.status).toBe(200);
+    expect(unlockedChange.body.data.session.currentJobId.title).toBe("Software Developer");
+  });
+
   it("advances one month or one year and keeps the run active when death is not rolled", async () => {
     const user = await createUser();
     const authorization = await authHeader(user);
