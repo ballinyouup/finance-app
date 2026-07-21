@@ -21,6 +21,15 @@ export function createVerificationToken() {
   };
 }
 
+export function createPasswordResetToken() {
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  return {
+    rawToken,
+    hashedToken: hashToken(rawToken),
+    expiresAt: new Date(Date.now() + 30 * 60 * 1000)
+  };
+}
+
 export function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }

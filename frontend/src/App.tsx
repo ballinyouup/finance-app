@@ -200,6 +200,8 @@ function App() {
                 }
               />
               <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route
                 path="/dashboard"
                 element={
@@ -512,6 +514,9 @@ function LoginForm({
       <Button type="button" variant="ghost" onClick={resend}>
         Resend verification
       </Button>
+      <Button render={<Link to="/forgot-password" />} type="button" variant="link">
+        Forgot password?
+      </Button>
     </form>
   )
 }
@@ -576,16 +581,139 @@ function SignupForm({ setNotice }: { setNotice: (notice: string | null) => void 
           id="signup-password"
           type="password"
           value={password}
-          minLength={8}
+          minLength={10}
           onChange={(event) => setPassword(event.target.value)}
           required
         />
+        <p className="text-xs text-muted-foreground">
+          Use at least 10 characters with uppercase, lowercase, a number, and a symbol.
+        </p>
       </Field>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button disabled={loading} type="submit">
         {loading ? "Creating..." : "Create Account"}
       </Button>
     </form>
+  )
+}
+
+function ForgotPasswordPage() {
+  const [email, setEmail] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    setLoading(true)
+    setMessage(null)
+    setError(null)
+
+    try {
+      const data = await api.forgotPassword(email)
+      setMessage(data.message)
+    } catch (submitError) {
+      setError(getErrorMessage(submitError))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Card className="mx-auto max-w-md">
+      <CardHeader>
+        <CardTitle>Forgot password</CardTitle>
+        <CardDescription>
+          Enter your email and MoneySim will send a password reset link.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form className="grid gap-4" onSubmit={handleSubmit}>
+          <Field id="forgot-email" label="Email">
+            <Input
+              id="forgot-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </Field>
+          {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <Button disabled={loading} type="submit">
+            {loading ? "Sending..." : "Send Reset Link"}
+          </Button>
+          <Button render={<Link to="/login" />} type="button" variant="ghost">
+            Back to Login
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ResetPasswordPage() {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const [token, setToken] = useState(searchParams.get("token") ?? "")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    setLoading(true)
+    setMessage(null)
+    setError(null)
+
+    try {
+      const data = await api.resetPassword({ token, password })
+      setMessage(data.message)
+      window.setTimeout(() => navigate("/login"), 1200)
+    } catch (submitError) {
+      setError(getErrorMessage(submitError))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Card className="mx-auto max-w-md">
+      <CardHeader>
+        <CardTitle>Reset password</CardTitle>
+        <CardDescription>
+          Choose a new password with uppercase, lowercase, a number, and a symbol.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form className="grid gap-4" onSubmit={handleSubmit}>
+          <Field id="reset-token" label="Reset token">
+            <Input
+              id="reset-token"
+              value={token}
+              onChange={(event) => setToken(event.target.value)}
+              required
+            />
+          </Field>
+          <Field id="reset-password" label="New password">
+            <Input
+              id="reset-password"
+              type="password"
+              value={password}
+              minLength={10}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </Field>
+          {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <Button disabled={loading} type="submit">
+            {loading ? "Resetting..." : "Reset Password"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
 
