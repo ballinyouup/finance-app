@@ -1067,8 +1067,14 @@ function ActiveSession({
   const projectedVariable = foodCost + entertainmentCost + datingCost
 
   return (
-    <div className="grid gap-5">
-      <section className="grid gap-4 md:grid-cols-3">
+    <div className="grid gap-8">
+      <section className="dashboard-section">
+        <div className="section-heading">
+          <p className="section-kicker">Your Life</p>
+          <h2>Overview</h2>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
         <StatCard
           label="Age"
           value={`${ageYears}y ${ageRemainderMonths}m`}
@@ -1080,7 +1086,14 @@ function ActiveSession({
           value={money(session.studentDebt)}
           note={session.lifePath === "college" ? `${session.educationMonths} college months` : "Not enrolled"}
         />
+        </div>
       </section>
+
+      <section className="dashboard-section">
+        <div className="section-heading">
+          <p className="section-kicker">Work and Expenses</p>
+          <h2>Career and Commitments</h2>
+        </div>
 
       <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
         <Card>
@@ -1124,7 +1137,7 @@ function ActiveSession({
         </Card>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3">
         <StatCard
           label="Career"
           value={`${session.currentJobId.careerTrack} · Level ${session.careerLevel ?? 0}`}
@@ -1140,7 +1153,14 @@ function ActiveSession({
           value={session.homeOwned ? "Homeowner" : "Renting"}
           note={session.homeOwned ? "Home goal complete" : "Save $30,000 to buy"}
         />
+      </div>
       </section>
+
+      <section className="dashboard-section">
+        <div className="section-heading">
+          <p className="section-kicker">Monthly Preview</p>
+          <h2>This Month</h2>
+        </div>
 
       <MonthForecast
         session={session}
@@ -1148,6 +1168,13 @@ function ActiveSession({
         variableExpenses={projectedVariable}
         debtPayment={choices.debtPayment}
       />
+      </section>
+
+      <section className="dashboard-section">
+        <div className="section-heading">
+          <p className="section-kicker">Personal Growth</p>
+          <h2>Education</h2>
+        </div>
 
       <Card>
         <CardHeader>
@@ -1168,6 +1195,7 @@ function ActiveSession({
           )}
         </CardContent>
       </Card>
+      </section>
 
       {lastHistory?.eventTitle ? (
         <Alert>
@@ -1180,6 +1208,12 @@ function ActiveSession({
           </AlertDescription>
         </Alert>
       ) : null}
+
+      <section className="dashboard-section">
+        <div className="section-heading">
+          <p className="section-kicker">Progress</p>
+          <h2>Goals</h2>
+        </div>
 
       <Card>
         <CardHeader>
@@ -1199,16 +1233,30 @@ function ActiveSession({
           ) : null}
         </CardContent>
       </Card>
+      </section>
 
-      <section className="grid gap-4 md:grid-cols-5">
+      <section className="dashboard-section">
+        <div className="section-heading">
+          <p className="section-kicker">Wellbeing</p>
+          <h2>Needs</h2>
+        </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <NeedCard label="Happiness" value={session.needs.happiness} />
         <NeedCard label="Hunger" value={session.needs.hunger} />
         <NeedCard label="Entertainment" value={session.needs.entertainment} />
         <NeedCard label="Love" value={session.needs.love} />
         <NeedCard label="Energy" value={session.needs.energy ?? 70} />
+      </div>
       </section>
 
-      <Card className="border-primary/40 shadow-sm">
+      <section className="dashboard-section">
+        <div className="section-heading">
+          <p className="section-kicker">Make Your Choices</p>
+          <h2>Monthly Plan</h2>
+        </div>
+
+      <Card className="monthly-plan-card border-primary/40 shadow-sm">
         <CardHeader>
           <CardTitle>Monthly plan</CardTitle>
           <CardDescription>
@@ -1306,10 +1354,23 @@ function ActiveSession({
           </div>
         </CardContent>
       </Card>
+      </section>
 
-      <NextSteps session={session} jobs={jobs} />
+      <section className="dashboard-section">
+        <div className="section-heading">
+          <p className="section-kicker">What Comes Next</p>
+          <h2>Next Steps</h2>
+        </div>
+        <NextSteps session={session} jobs={jobs} />
+      </section>
 
-      <HistoryTable session={session} />
+      <section className="dashboard-section">
+        <div className="section-heading">
+          <p className="section-kicker">Your Timeline</p>
+          <h2>History</h2>
+        </div>
+        <HistoryTable session={session} />
+      </section>
     </div>
   )
 }
