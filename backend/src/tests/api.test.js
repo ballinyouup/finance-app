@@ -42,7 +42,7 @@ async function createUser(overrides = {}) {
   return User.create({
     name: "Test Player",
     email: "player@example.com",
-    passwordHash: await bcrypt.hash("password123", 12),
+    passwordHash: await bcrypt.hash("Password123!", 12),
     isVerified: true,
     ...overrides
   });
@@ -63,8 +63,19 @@ async function lowExpenseSelections() {
 }
 
 describe("auth routes", () => {
-  it("allows the production domain through CORS", async () => {
+  it("rejects weak passwords during signup", async () => {
     const response = await request(app)
+      .post("/api/auth/signup")
+      .send({
+        name: "Weak User",
+        email: "weak@example.com",
+        password: "password"
+      });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("allows the production domain through CORS", async () => {    const response = await request(app)
       .options("/api/auth/login")
       .set("Origin", "https://moneysim.app")
       .set("Access-Control-Request-Method", "POST");
@@ -77,7 +88,7 @@ describe("auth routes", () => {
     const signup = await request(app).post("/api/auth/signup").send({
       name: "New Player",
       email: "new@example.com",
-      password: "password123"
+      password: "Password123!"
     });
 
     expect(signup.status).toBe(201);
@@ -86,7 +97,7 @@ describe("auth routes", () => {
 
     const login = await request(app).post("/api/auth/login").send({
       email: "new@example.com",
-      password: "password123"
+      password: "Password123!"
     });
 
     expect(login.status).toBe(403);
@@ -109,7 +120,7 @@ describe("auth routes", () => {
 
     const login = await request(app).post("/api/auth/login").send({
       email: user.email,
-      password: "password123"
+      password: "Password123!"
     });
 
     expect(login.status).toBe(200);
