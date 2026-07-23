@@ -69,29 +69,38 @@ const jobApplicationResultSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const vehicleStatusSchema = {
-  type: { type: String, enum: ["none", "used-car", "new-car"], default: "none" },
-  mileage: { type: Number, default: 0, min: 0 },
-  condition: { type: Number, default: 100, min: 0, max: 100 },
-  broken: { type: Boolean, default: false },
-  lastRepairCost: { type: Number, default: 0, min: 0 }
-};
+const vehicleStatusSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ["none", "used-car", "new-car"], default: "none" },
+    mileage: { type: Number, default: 0, min: 0 },
+    condition: { type: Number, default: 100, min: 0, max: 100 },
+    broken: { type: Boolean, default: false },
+    lastRepairCost: { type: Number, default: 0, min: 0 }
+  },
+  { _id: false }
+);
 
-const stockPortfolioSchema = {
-  invested: { type: Number, default: 0, min: 0 },
-  value: { type: Number, default: 0, min: 0 }
-};
+const stockPortfolioSchema = new mongoose.Schema(
+  {
+    invested: { type: Number, default: 0, min: 0 },
+    value: { type: Number, default: 0, min: 0 }
+  },
+  { _id: false }
+);
 
-const ownedHomeSchema = {
-  homeId: { type: String },
-  label: { type: String },
-  purchasePrice: { type: Number, default: 0, min: 0 },
-  estimatedValue: { type: Number, default: 0, min: 0 },
-  monthlyUpkeep: { type: Number, default: 0, min: 0 },
-  drift: { type: Number, default: 0 },
-  volatility: { type: Number, default: 0 },
-  purchasedMonth: { type: Number, default: 1, min: 1 }
-};
+const ownedHomeSchema = new mongoose.Schema(
+  {
+    homeId: { type: String },
+    label: { type: String },
+    purchasePrice: { type: Number, default: 0, min: 0 },
+    estimatedValue: { type: Number, default: 0, min: 0 },
+    monthlyUpkeep: { type: Number, default: 0, min: 0 },
+    drift: { type: Number, default: 0 },
+    volatility: { type: Number, default: 0 },
+    purchasedMonth: { type: Number, default: 1, min: 1 }
+  },
+  { _id: false }
+);
 
 const assetHoldingSchema = new mongoose.Schema(
   {
@@ -107,19 +116,22 @@ const assetHoldingSchema = new mongoose.Schema(
   { timestamps: false }
 );
 
-const deathRecapSchema = {
-  reason: { type: String },
-  roll: { type: Number },
-  chance: { type: Number },
-  ageMonths: { type: Number },
-  balance: { type: Number },
-  studentDebt: { type: Number },
-  assetValue: { type: Number },
-  finalScore: { type: Number },
-  jobTitle: { type: String },
-  eventTitle: { type: String },
-  needs: needsSchema
-};
+const deathRecapSchema = new mongoose.Schema(
+  {
+    reason: { type: String },
+    roll: { type: Number },
+    chance: { type: Number },
+    ageMonths: { type: Number },
+    balance: { type: Number },
+    studentDebt: { type: Number },
+    assetValue: { type: Number },
+    finalScore: { type: Number },
+    jobTitle: { type: String },
+    eventTitle: { type: String },
+    needs: needsSchema
+  },
+  { _id: false }
+);
 
 const gameSessionSchema = new mongoose.Schema(
   {
