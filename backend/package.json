@@ -9,7 +9,8 @@
     "dev": "nodemon server.js",
     "seed": "node src/seed/seed.js",
     "db:reset": "node src/seed/resetDatabase.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e:server": "node src/tests/e2eServer.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

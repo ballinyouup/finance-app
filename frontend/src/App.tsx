@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useState,
   type FormEvent,
@@ -75,6 +76,7 @@ import {
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -1161,6 +1163,9 @@ function StartRunPanel({
   const [selections, setSelections] = useState<ExpenseSelections>(() =>
     defaultSelections(optionsByCategory),
   )
+  const pathLabelId = useId()
+  const majorLabelId = useId()
+  const jobLabelId = useId()
   const availableJobs = useMemo(
     () => jobs.filter((job) => lifePath !== "college" || !job.requiresDegree),
     [jobs, lifePath],
@@ -1185,14 +1190,14 @@ function StartRunPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Start New Run</CardTitle>
+        <CardTitle role="heading" aria-level={2}>Start New Run</CardTitle>
         <CardDescription>
           Start freshly 18. Choose work now or college with loans.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
         <div className="grid gap-2">
-          <Label>Path</Label>
+          <Label id={pathLabelId}>Path</Label>
           <Select
             items={[
               { label: "Work full-time", value: "work" },
@@ -1205,7 +1210,7 @@ function StartRunPanel({
               }
             }}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger aria-labelledby={pathLabelId} className="w-full">
               <SelectValue placeholder="Choose a life path" />
             </SelectTrigger>
             <SelectContent>
@@ -1218,7 +1223,7 @@ function StartRunPanel({
         </div>
         {lifePath === "college" ? (
           <div className="grid gap-2">
-            <Label>College major</Label>
+            <Label id={majorLabelId}>College major</Label>
             <Select
               items={[
                 { label: "Computer Science", value: "computer-science" },
@@ -1228,7 +1233,7 @@ function StartRunPanel({
               value={major}
               onValueChange={(value) => value && setMajor(value as Major)}
             >
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectTrigger aria-labelledby={majorLabelId} className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent><SelectGroup>
                 <SelectItem value="computer-science">Computer Science</SelectItem>
                 <SelectItem value="business">Business</SelectItem>
@@ -1239,8 +1244,13 @@ function StartRunPanel({
           </div>
         ) : null}
         <div className="grid gap-2">
-          <Label>{lifePath === "college" ? "Part-time job while enrolled" : "Starting job"}</Label>
-          <JobSelect jobs={availableJobs} value={jobId} onValueChange={setJobId} />
+          <Label id={jobLabelId}>{lifePath === "college" ? "Part-time job while enrolled" : "Starting job"}</Label>
+          <JobSelect
+            jobs={availableJobs}
+            labelId={jobLabelId}
+            value={jobId}
+            onValueChange={setJobId}
+          />
           {lifePath === "college" ? (
             <p className="text-sm text-muted-foreground">
               Degree-required careers unlock after you graduate in 48 months.
@@ -1277,9 +1287,18 @@ function StartRunPanel({
                       : "Set goals as you go: save money, pay off debt, build a career, and buy a home. Events and your choices shape the outcome."}
               </DialogDescription>
             </DialogHeader>
-            <div className="flex gap-1" aria-label={`Tutorial step ${tutorialStep + 1} of 4`}>
+            <div
+              aria-label="Tutorial progress"
+              aria-valuemax={4}
+              aria-valuemin={1}
+              aria-valuenow={tutorialStep + 1}
+              aria-valuetext={`Step ${tutorialStep + 1} of 4`}
+              className="flex gap-1"
+              role="progressbar"
+            >
               {[0, 1, 2, 3].map((step) => (
                 <span
+                  aria-hidden="true"
                   key={step}
                   className={`h-1 flex-1 rounded-full ${step <= tutorialStep ? "bg-primary" : "bg-muted"}`}
                 />
@@ -1345,7 +1364,7 @@ const ActiveSession = memo(function ActiveSession({
   const lastHistory = session.history.at(-1)
 
   return (
-    <div className="grid gap-4">
+    <div aria-busy={busy} className="grid gap-4">
       <LifeStatusPanel session={session} fixedExpenses={expenseTotal} />
       <div className="flex justify-end">
         <EndRunDialog busy={busy} onEndRun={onEndRun} />
@@ -1571,11 +1590,12 @@ const MonthlyPlanPanel = memo(function MonthlyPlanPanel({
     : session.currentJobId.monthlySalary * (1 + (session.careerLevel ?? 0) * 0.12) * (enrolled ? 0.35 : graduated ? 1.55 : 1)
   const expenses = fixedExpenses + variableExpenses + choices.debtPayment
   const projectedChange = income - expenses
+  const focusLabelId = useId()
 
   return (
     <Card className="border-primary/40 bg-gradient-to-br from-card to-emerald-50/70 shadow-sm">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2" role="heading" aria-level={2}>
           <RefreshCw className="size-5" aria-hidden="true" />
           Monthly Plan
         </CardTitle>
@@ -1592,8 +1612,12 @@ const MonthlyPlanPanel = memo(function MonthlyPlanPanel({
         </div>
         <div className="grid gap-3 lg:grid-cols-[1fr_1.1fr]">
           <div className="grid gap-2">
-            <Label>Focus</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <Label id={focusLabelId}>Focus</Label>
+            <div
+              aria-labelledby={focusLabelId}
+              className="grid grid-cols-2 gap-2"
+              role="group"
+            >
               {([
                 ["study", "Study"],
                 ["exercise", "Exercise"],
@@ -1604,6 +1628,7 @@ const MonthlyPlanPanel = memo(function MonthlyPlanPanel({
                   key={activity}
                   type="button"
                   variant={choices.activity === activity ? "default" : "outline"}
+                  aria-pressed={choices.activity === activity}
                   disabled={busy}
                   onClick={() => setChoices((current) => ({ ...current, activity }))}
                 >
@@ -1615,6 +1640,7 @@ const MonthlyPlanPanel = memo(function MonthlyPlanPanel({
               <Button
                 type="button"
                 variant={choices.internship ? "default" : "outline"}
+                aria-pressed={choices.internship}
                 disabled={busy}
                 onClick={() => setChoices((current) => ({ ...current, internship: !current.internship }))}
               >
@@ -1689,17 +1715,27 @@ function CompactMetric({ label, value }: { label: string; value: string }) {
 function NeedMeter({ label, value }: { label: string; value: number }) {
   const rounded = Math.round(value)
   const barColor = rounded < 25 ? "bg-red-500" : rounded < 50 ? "bg-amber-500" : "bg-emerald-600"
+  const labelId = useId()
+  const valueId = useId()
 
   return (
     <div className="grid grid-cols-[7rem_1fr_3rem] items-center gap-3 rounded-lg border bg-background px-3 py-2">
-      <p className="font-medium">{label}</p>
-      <div className="h-2 overflow-hidden rounded-full bg-muted">
+      <p className="font-medium" id={labelId}>{label}</p>
+      <div
+        aria-labelledby={labelId}
+        aria-describedby={valueId}
+        aria-valuemax={100}
+        aria-valuemin={0}
+        aria-valuenow={rounded}
+        className="h-2 overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+      >
         <div
           className={`h-full rounded-full ${barColor}`}
           style={{ width: `${Math.max(0, Math.min(100, rounded))}%` }}
         />
       </div>
-      <p className="text-right font-semibold">{rounded}</p>
+      <p className="text-right font-semibold" id={valueId}>{rounded}</p>
     </div>
   )
 }
@@ -1708,7 +1744,7 @@ const NeedsPanel = memo(function NeedsPanel({ session }: { session: GameSession 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Needs</CardTitle>
+        <CardTitle role="heading" aria-level={2}>Needs</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-2 sm:grid-cols-2">
         <NeedMeter label="Happiness" value={session.needs.happiness} />
@@ -1731,7 +1767,7 @@ const NextStepsPanel = memo(function NextStepsPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Next Steps</CardTitle>
+        <CardTitle role="heading" aria-level={2}>Next Steps</CardTitle>
       </CardHeader>
       <CardContent>
         <NextSteps session={session} jobs={jobs} />
@@ -1780,6 +1816,9 @@ const AssetsAndDebtPanel = memo(function AssetsAndDebtPanel({
   const [stockAmount, setStockAmount] = useState(500)
   const [homeId, setHomeId] = useState(homeOptions[0].id)
   const [assetId, setAssetId] = useState(assetOptions[0].id)
+  const stockAmountId = useId()
+  const homeSelectLabelId = useId()
+  const assetSelectLabelId = useId()
   const selectedHome = homeOptions.find((home) => home.id === homeId) ?? homeOptions[0]
   const selectedAsset = assetOptions.find((asset) => asset.id === assetId) ?? assetOptions[0]
   const stockValue = session.stockPortfolio?.value ?? 0
@@ -1814,7 +1853,9 @@ const AssetsAndDebtPanel = memo(function AssetsAndDebtPanel({
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+          <Label className="sr-only" htmlFor={stockAmountId}>Stock investment amount</Label>
           <Input
+            id={stockAmountId}
             min={1}
             type="number"
             value={stockAmount}
@@ -1844,6 +1885,7 @@ const AssetsAndDebtPanel = memo(function AssetsAndDebtPanel({
           </Button>
         ) : (
           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Label className="sr-only" id={homeSelectLabelId}>Home to buy</Label>
             <Select
               items={homeOptions.map((home) => ({
                 label: `${home.label} · ${money(home.price)}`,
@@ -1852,7 +1894,7 @@ const AssetsAndDebtPanel = memo(function AssetsAndDebtPanel({
               value={homeId}
               onValueChange={(value) => value && setHomeId(value)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger aria-labelledby={homeSelectLabelId} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1896,6 +1938,7 @@ const AssetsAndDebtPanel = memo(function AssetsAndDebtPanel({
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <Label className="sr-only" id={assetSelectLabelId}>Asset to buy</Label>
           <Select
             items={assetOptions.map((asset) => ({
               label: `${asset.label} · ${money(asset.price)}`,
@@ -1904,7 +1947,7 @@ const AssetsAndDebtPanel = memo(function AssetsAndDebtPanel({
             value={assetId}
             onValueChange={(value) => value && setAssetId(value)}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger aria-labelledby={assetSelectLabelId} className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1931,7 +1974,13 @@ const AssetsAndDebtPanel = memo(function AssetsAndDebtPanel({
                     value {money(asset.estimatedValue)} · bought {money(asset.purchasePrice)}
                   </span>
                 </p>
-                <Button size="sm" disabled={busy} variant="outline" onClick={() => onSellAsset(asset._id)}>
+                <Button
+                  aria-label={`Sell ${asset.label}`}
+                  size="sm"
+                  disabled={busy}
+                  variant="outline"
+                  onClick={() => onSellAsset(asset._id)}
+                >
                   Sell
                 </Button>
               </div>
@@ -1973,7 +2022,7 @@ function ResultsScreen({
   return (
     <Card className="border-destructive/30">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2" role="heading" aria-level={2}>
           <Medal className="size-5 text-destructive" aria-hidden="true" />
           {endedByPlayer ? "Run Recap" : "Death Recap"}
         </CardTitle>
@@ -2037,6 +2086,7 @@ function ResultsScreen({
 function EnrollCollegeDialog({ busy, onEnroll }: { busy: boolean; onEnroll: (major: Major) => void }) {
   const [open, setOpen] = useState(false)
   const [major, setMajor] = useState<Major>("business")
+  const majorLabelId = useId()
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -2049,7 +2099,7 @@ function EnrollCollegeDialog({ busy, onEnroll }: { busy: boolean; onEnroll: (maj
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-2">
-          <Label>Major</Label>
+          <Label id={majorLabelId}>Major</Label>
           <Select
             items={[
               { label: "Computer Science", value: "computer-science" },
@@ -2059,7 +2109,7 @@ function EnrollCollegeDialog({ busy, onEnroll }: { busy: boolean; onEnroll: (maj
             value={major}
             onValueChange={(value) => value && setMajor(value as Major)}
           >
-            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-labelledby={majorLabelId} className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent><SelectGroup>
               <SelectItem value="computer-science">Computer Science</SelectItem>
               <SelectItem value="business">Business</SelectItem>
@@ -2151,6 +2201,7 @@ const JobMarket = memo(function JobMarket({
             const disabled = busy || hasAppliedThisMonth || Boolean(lockMessage)
             const button = (
               <Button
+                aria-label={`${lockMessage ? "Locked" : hasAppliedThisMonth ? "Applied to" : "Apply to"} ${job.title}`}
                 disabled={disabled}
                 onClick={() => onApplyForJob(job._id)}
                 variant={lockMessage ? "outline" : "default"}
@@ -2206,10 +2257,12 @@ const JobMarket = memo(function JobMarket({
 
 const JobSelect = memo(function JobSelect({
   jobs,
+  labelId,
   value,
   onValueChange,
 }: {
   jobs: Job[]
+  labelId?: string
   value: string
   onValueChange: (value: string) => void
 }) {
@@ -2226,7 +2279,7 @@ const JobSelect = memo(function JobSelect({
         }
       }}
     >
-      <SelectTrigger className="w-full">
+      <SelectTrigger aria-labelledby={labelId} className="w-full">
         <SelectValue placeholder="Select a job" />
       </SelectTrigger>
       <SelectContent>
@@ -2255,9 +2308,13 @@ const ExpensePickerGrid = memo(function ExpensePickerGrid({
   disabled?: boolean
   onChange: (category: MonthlyExpenseCategory, optionId: string) => void
 }) {
+  const fieldPrefix = useId()
+
   return (
     <div className="grid gap-3">
       {monthlyCategories.map((category) => {
+        const fieldId = `${fieldPrefix}-${category.toLowerCase()}`
+        const statusId = `${fieldId}-status`
         const selectedOption = optionsByCategory[category].find(
           (option) => option._id === selections[category],
         )
@@ -2268,7 +2325,7 @@ const ExpensePickerGrid = memo(function ExpensePickerGrid({
 
         return (
         <div className="grid min-w-0 gap-2" key={category}>
-          <Label>{category}</Label>
+          <Label id={fieldId}>{category}</Label>
           <Select
             items={optionsByCategory[category].map((option) => ({
               label: `${option.tier}: ${option.label} · ${money(option.monthlyCost)}`,
@@ -2282,7 +2339,11 @@ const ExpensePickerGrid = memo(function ExpensePickerGrid({
             }}
             disabled={disabled || Boolean(lockMessage)}
           >
-            <SelectTrigger className="w-full min-w-0">
+            <SelectTrigger
+              aria-describedby={lockMessage || statusMessage ? statusId : undefined}
+              aria-labelledby={fieldId}
+              className="w-full min-w-0"
+            >
               <SelectValue placeholder={`Select ${category}`} />
             </SelectTrigger>
             <SelectContent>
@@ -2296,9 +2357,9 @@ const ExpensePickerGrid = memo(function ExpensePickerGrid({
             </SelectContent>
           </Select>
           {lockMessage ? (
-            <p className="text-xs text-muted-foreground">{lockMessage}</p>
+            <p className="text-xs text-muted-foreground" id={statusId}>{lockMessage}</p>
           ) : statusMessage ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground" id={statusId}>
               {statusMessage}
             </p>
           ) : null}
@@ -2326,6 +2387,9 @@ const HistoryTable = memo(function HistoryTable({ session }: { session: GameSess
             ))}
           </div>
           <div className="overflow-x-auto"><Table>
+            <TableCaption className="sr-only">
+              Recent monthly history for the current run
+            </TableCaption>
             <TableHeader>
               <TableRow>
                 <TableHead>Month</TableHead>
@@ -2642,10 +2706,13 @@ const MonthlyChoiceInput = memo(function MonthlyChoiceInput({
   cost: number
   onChange: (value: number) => void
 }) {
+  const inputId = useId()
+
   return (
     <div className="grid gap-2">
-      <Label>{label}</Label>
+      <Label htmlFor={inputId}>{label}</Label>
       <Input
+        id={inputId}
         type="number"
         min={0}
         max={30}
