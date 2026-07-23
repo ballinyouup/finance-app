@@ -260,7 +260,7 @@ function Shell({
     <header className="app-header border-b bg-background/85 backdrop-blur">
       <nav className="mx-auto flex min-h-14 w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <Link className="flex items-center gap-2 font-semibold" to="/">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-emerald-700 text-white">
             <CircleDollarSign className="size-5" aria-hidden="true" />
           </span>
           MoneySim
@@ -1392,6 +1392,8 @@ const ActiveSession = memo(function ActiveSession({
       <NeedsPanel session={session} />
       <NextStepsPanel session={session} jobs={jobs} />
 
+      <section aria-labelledby="life-details-heading">
+        <h2 id="life-details-heading" className="sr-only">Life details</h2>
       <Accordion multiple defaultValue={[]}>
         <AccordionSection
           title="Career and Commitments"
@@ -1496,6 +1498,7 @@ const ActiveSession = memo(function ActiveSession({
           <HistoryTable session={session} />
         </AccordionSection>
       </Accordion>
+      </section>
     </div>
   )
 })
@@ -1542,7 +1545,7 @@ const LifeStatusPanel = memo(function LifeStatusPanel({
     <Card className="border-primary/20 bg-background">
       <CardContent className="grid gap-3 p-4 sm:grid-cols-[1.4fr_repeat(3,0.75fr)] sm:items-center">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-lg font-semibold text-white">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-lg font-semibold text-white">
             {ageYears}
           </span>
           <div className="min-w-0">
