@@ -1,4 +1,6 @@
 import {
+  memo,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -823,7 +825,7 @@ function DashboardPage({ token }: { token: string }) {
     }
   }, [token])
 
-  async function startRun(
+  const startRun = useCallback(async function startRun(
     lifePath: LifePath,
     jobId: string,
     expenseSelections: ExpenseSelections,
@@ -847,9 +849,9 @@ function DashboardPage({ token }: { token: string }) {
     } finally {
       setBusy(false)
     }
-  }
+  }, [token])
 
-  async function updateJob(jobId: string) {
+  const updateJob = useCallback(async function updateJob(jobId: string) {
     setBusy(true)
     setError(null)
 
@@ -861,9 +863,9 @@ function DashboardPage({ token }: { token: string }) {
     } finally {
       setBusy(false)
     }
-  }
+  }, [token])
 
-  async function updateExpense(category: MonthlyExpenseCategory, optionId: string) {
+  const updateExpense = useCallback(async function updateExpense(category: MonthlyExpenseCategory, optionId: string) {
     setBusy(true)
     setError(null)
 
@@ -875,9 +877,9 @@ function DashboardPage({ token }: { token: string }) {
     } finally {
       setBusy(false)
     }
-  }
+  }, [token])
 
-  async function advanceMonths(months: number, choices: MonthlyChoices) {
+  const advanceMonths = useCallback(async function advanceMonths(months: number, choices: MonthlyChoices) {
     setBusy(true)
     setError(null)
 
@@ -895,9 +897,9 @@ function DashboardPage({ token }: { token: string }) {
     } finally {
       setBusy(false)
     }
-  }
+  }, [token])
 
-  async function buyHome() {
+  const buyHome = useCallback(async function buyHome() {
     setBusy(true)
     setError(null)
     try {
@@ -908,9 +910,9 @@ function DashboardPage({ token }: { token: string }) {
     } finally {
       setBusy(false)
     }
-  }
+  }, [token])
 
-  async function enrollCollege(major: Major) {
+  const enrollCollege = useCallback(async function enrollCollege(major: Major) {
     setBusy(true)
     setError(null)
     try {
@@ -921,7 +923,7 @@ function DashboardPage({ token }: { token: string }) {
     } finally {
       setBusy(false)
     }
-  }
+  }, [token])
 
   if (loading) {
     return <PageSkeleton />
@@ -1161,7 +1163,7 @@ function StartRunPanel({
   )
 }
 
-function ActiveSession({
+const ActiveSession = memo(function ActiveSession({
   session,
   jobs,
   optionsByCategory,
@@ -1182,7 +1184,17 @@ function ActiveSession({
   onBuyHome: () => void
   onEnrollCollege: (major: Major) => void
 }) {
-  const expenseTotal = sumSelectedExpenses(session)
+  const expenseTotal = useMemo(() => sumSelectedExpenses(session), [session])
+  const selectedExpenseIds = useMemo(() => selectedIds(session), [session])
+  const eligibleJobs = useMemo(
+    () =>
+      jobs.filter(
+        (job) =>
+          !job.requiresDegree ||
+          (session.lifePath === "college" && session.educationMonths >= 48),
+      ),
+    [jobs, session.educationMonths, session.lifePath],
+  )
   const [choices, setChoices] = useState<MonthlyChoices>(
     { ...startingMonthlyChoices, ...session.monthlyChoices },
   )
@@ -1196,10 +1208,10 @@ function ActiveSession({
 
   return (
     <div className="grid gap-8">
-      <section className="dashboard-section">
-        <div className="section-heading">
-          <p className="section-kicker">Your Life</p>
-          <h2>Overview</h2>
+      <section className="grid gap-4">
+        <div className="grid gap-0.5 pl-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Your Life</p>
+          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Overview</h2>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -1217,10 +1229,10 @@ function ActiveSession({
         </div>
       </section>
 
-      <section className="dashboard-section">
-        <div className="section-heading">
-          <p className="section-kicker">Work and Expenses</p>
-          <h2>Career and Commitments</h2>
+      <section className="grid gap-4">
+        <div className="grid gap-0.5 pl-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Work and Expenses</p>
+          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Career and Commitments</h2>
         </div>
 
       <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
@@ -1236,11 +1248,7 @@ function ActiveSession({
           <CardContent>
             <ChangeJobDialog
               busy={busy}
-              jobs={jobs.filter(
-                (job) =>
-                  !job.requiresDegree ||
-                  (session.lifePath === "college" && session.educationMonths >= 48),
-              )}
+              jobs={eligibleJobs}
               value={session.currentJobId._id}
               onChangeJob={onChangeJob}
             />
@@ -1257,7 +1265,7 @@ function ActiveSession({
           <CardContent>
             <ExpensePickerGrid
               optionsByCategory={optionsByCategory}
-              selections={selectedIds(session)}
+              selections={selectedExpenseIds}
               onChange={onChangeExpense}
               disabled={busy}
             />
@@ -1284,10 +1292,10 @@ function ActiveSession({
       </div>
       </section>
 
-      <section className="dashboard-section">
-        <div className="section-heading">
-          <p className="section-kicker">Monthly Preview</p>
-          <h2>This Month</h2>
+      <section className="grid gap-4">
+        <div className="grid gap-0.5 pl-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Monthly Preview</p>
+          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">This Month</h2>
         </div>
 
       <MonthForecast
@@ -1298,10 +1306,10 @@ function ActiveSession({
       />
       </section>
 
-      <section className="dashboard-section">
-        <div className="section-heading">
-          <p className="section-kicker">Personal Growth</p>
-          <h2>Education</h2>
+      <section className="grid gap-4">
+        <div className="grid gap-0.5 pl-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Personal Growth</p>
+          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Education</h2>
         </div>
 
       <Card>
@@ -1337,10 +1345,10 @@ function ActiveSession({
         </Alert>
       ) : null}
 
-      <section className="dashboard-section">
-        <div className="section-heading">
-          <p className="section-kicker">Progress</p>
-          <h2>Goals</h2>
+      <section className="grid gap-4">
+        <div className="grid gap-0.5 pl-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Progress</p>
+          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Goals</h2>
         </div>
 
       <Card>
@@ -1363,10 +1371,10 @@ function ActiveSession({
       </Card>
       </section>
 
-      <section className="dashboard-section">
-        <div className="section-heading">
-          <p className="section-kicker">Wellbeing</p>
-          <h2>Needs</h2>
+      <section className="grid gap-4">
+        <div className="grid gap-0.5 pl-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Wellbeing</p>
+          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Needs</h2>
         </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -1378,13 +1386,13 @@ function ActiveSession({
       </div>
       </section>
 
-      <section className="dashboard-section">
-        <div className="section-heading">
-          <p className="section-kicker">Make Your Choices</p>
-          <h2>Monthly Plan</h2>
+      <section className="grid gap-4">
+        <div className="grid gap-0.5 pl-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Make Your Choices</p>
+          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Monthly Plan</h2>
         </div>
 
-      <Card className="monthly-plan-card border-primary/40 shadow-sm">
+      <Card className="border-primary/40 bg-gradient-to-br from-card to-emerald-50/70 shadow-sm">
         <CardHeader>
           <CardTitle>Monthly plan</CardTitle>
           <CardDescription>
@@ -1484,26 +1492,26 @@ function ActiveSession({
       </Card>
       </section>
 
-      <section className="dashboard-section">
-        <div className="section-heading">
-          <p className="section-kicker">What Comes Next</p>
-          <h2>Next Steps</h2>
+      <section className="grid gap-4">
+        <div className="grid gap-0.5 pl-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">What Comes Next</p>
+          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Next Steps</h2>
         </div>
         <NextSteps session={session} jobs={jobs} />
       </section>
 
-      <section className="dashboard-section">
-        <div className="section-heading">
-          <p className="section-kicker">Your Timeline</p>
-          <h2>History</h2>
+      <section className="grid gap-4">
+        <div className="grid gap-0.5 pl-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Your Timeline</p>
+          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">History</h2>
         </div>
         <HistoryTable session={session} />
       </section>
     </div>
   )
-}
+})
 
-function MonthForecast({
+const MonthForecast = memo(function MonthForecast({
   session,
   fixedExpenses,
   variableExpenses,
@@ -1536,14 +1544,14 @@ function MonthForecast({
       </CardContent>
     </Card>
   )
-}
+})
 
 function ForecastItem({ label, value, tone }: { label: string; value: string; tone: string }) {
   return <div className="rounded-lg border bg-background px-3 py-2"><p className="text-xs text-muted-foreground">{label}</p><p className={`font-semibold ${tone}`}>{value}</p></div>
 }
 
-function NextSteps({ session, jobs }: { session: GameSession; jobs: Job[] }) {
-  const tips = getGameTips(session, jobs)
+const NextSteps = memo(function NextSteps({ session, jobs }: { session: GameSession; jobs: Job[] }) {
+  const tips = useMemo(() => getGameTips(session, jobs), [jobs, session])
 
   return (
     <Card className="border-primary/20">
@@ -1558,7 +1566,7 @@ function NextSteps({ session, jobs }: { session: GameSession; jobs: Job[] }) {
       </CardContent>
     </Card>
   )
-}
+})
 
 function ResultsScreen({
   session,
@@ -1701,7 +1709,7 @@ function EnrollCollegeDialog({ busy, onEnroll }: { busy: boolean; onEnroll: (maj
   )
 }
 
-function JobSelect({
+const JobSelect = memo(function JobSelect({
   jobs,
   value,
   onValueChange,
@@ -1737,9 +1745,9 @@ function JobSelect({
       </SelectContent>
     </Select>
   )
-}
+})
 
-function ExpensePickerGrid({
+const ExpensePickerGrid = memo(function ExpensePickerGrid({
   optionsByCategory,
   selections,
   disabled = false,
@@ -1785,10 +1793,14 @@ function ExpensePickerGrid({
       ))}
     </div>
   )
-}
+})
 
-function HistoryTable({ session }: { session: GameSession }) {
-  const recentHistory = session.history.slice(-14).reverse()
+const HistoryTable = memo(function HistoryTable({ session }: { session: GameSession }) {
+  const recentHistory = useMemo(() => session.history.slice(-14).reverse(), [session.history])
+  const recentEvents = useMemo(
+    () => session.history.filter((round) => round.eventTitle).slice(-6),
+    [session.history],
+  )
 
   return (
     <Card>
@@ -1800,7 +1812,7 @@ function HistoryTable({ session }: { session: GameSession }) {
         {session.history.length ? (
           <>
           <div className="mb-4 flex flex-wrap gap-2">
-            {session.history.filter((round) => round.eventTitle).slice(-6).map((round) => (
+            {recentEvents.map((round) => (
               <Badge key={`${round.month}-${round.eventTitle}`} variant="secondary">Month {round.month}: {round.eventTitle}</Badge>
             ))}
           </div>
@@ -1846,7 +1858,7 @@ function HistoryTable({ session }: { session: GameSession }) {
       </CardContent>
     </Card>
   )
-}
+})
 
 function LeaderboardPage({ user }: { user: User | null }) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
@@ -1968,7 +1980,7 @@ function Field({
   )
 }
 
-function StatCard({
+const StatCard = memo(function StatCard({
   label,
   value,
   note,
@@ -1986,7 +1998,7 @@ function StatCard({
       </CardHeader>
     </Card>
   )
-}
+})
 
 function getGameTips(session: GameSession, jobs: Job[]) {
   const tips: string[] = []
@@ -2034,7 +2046,7 @@ function getGameTips(session: GameSession, jobs: Job[]) {
   return tips.length ? tips.slice(0, 4) : ["You are in a stable spot. Keep building skills, saving cash, and protecting your wellbeing."]
 }
 
-function NeedCard({ label, value }: { label: string; value: number }) {
+const NeedCard = memo(function NeedCard({ label, value }: { label: string; value: number }) {
   const rounded = Math.round(value)
   const status = rounded < 25 ? "Critical" : rounded < 50 ? "Strained" : "Stable"
   const NeedIcon = {
@@ -2061,9 +2073,9 @@ function NeedCard({ label, value }: { label: string; value: number }) {
       </CardHeader>
     </Card>
   )
-}
+})
 
-function MonthlyChoiceInput({
+const MonthlyChoiceInput = memo(function MonthlyChoiceInput({
   label,
   value,
   cost,
@@ -2089,7 +2101,7 @@ function MonthlyChoiceInput({
       <p className="text-sm text-muted-foreground">{money(cost)} planned</p>
     </div>
   )
-}
+})
 
 function PageSkeleton() {
   return (

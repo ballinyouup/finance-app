@@ -77,6 +77,10 @@ HOST=127.0.0.1
 PORT=5050
 ```
 
+`FRONTEND_URL` is the base URL used in verification emails. If it still points to
+the old IP address, newly registered users will receive verification links for
+that IP instead of `https://moneysim.app`.
+
 ## Nginx Reverse Proxy
 
 For production, prefer serving the frontend and API from the same origin:
@@ -91,10 +95,15 @@ sudo cp -R dist/* /var/www/moneysim.app/
 Then copy one of the sample nginx configs from `deploy/` into `/etc/nginx/sites-available/moneysim.app`, enable it, and reload nginx:
 
 ```bash
+sudo cp deploy/nginx-moneysim.app.conf /etc/nginx/sites-available/moneysim.app
 sudo ln -s /etc/nginx/sites-available/moneysim.app /etc/nginx/sites-enabled/moneysim.app
 sudo nginx -t
 sudo systemctl reload nginx
 ```
+
+The nginx config must include `try_files $uri $uri/ /index.html;` for frontend routes.
+Without that fallback, direct links like `/verify-email?token=...` can return nginx 404
+instead of loading the React app.
 
 ## Verification
 
