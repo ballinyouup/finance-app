@@ -53,3 +53,45 @@ export async function sendVerificationEmail({ to, name, token }) {
     messageId: data?.id
   });
 }
+
+export async function sendPasswordResetEmail({ to, name, token }) {
+  const url = new URL("/reset-password", env.FRONTEND_URL);
+  url.searchParams.set("token", token);
+
+  logger.info("Password reset email requested", {
+    provider: "resend",
+    to: maskEmail(to),
+    resendConfigured: Boolean(resend),
+    from: env.RESEND_FROM_EMAIL
+  });
+
+  if (!resend) {
+    logger.warn("Resend API key missing; using console password reset link", {
+      to: maskEmail(to),
+      resetUrl: url.toString()
+    });
+    return;
+  }
+
+  const { data, error } = await resend.emails.send({
+    from: env.RESEND_FROM_EMAIL,
+    to: [to],
+    subject: "Reset your MoneySim password",
+    text: `Hi ${name}, reset your MoneySim password here: ${url.toString()}`,
+    html: `<p>Hi ${name},</p><p><a href="${url.toString()}">Reset your password</a>.</p><p>This link expires in 30 minutes.</p>`
+  });
+
+  if (error) {
+    logger.error("Resend password reset email failed", {
+      to: maskEmail(to),
+      message: error.message,
+      name: error.name
+    });
+    throw new Error(error.message);
+  }
+
+  logger.info("Resend password reset email sent", {
+    to: maskEmail(to),
+    messageId: data?.id
+  });
+}

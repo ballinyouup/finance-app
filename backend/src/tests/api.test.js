@@ -13,6 +13,7 @@ import { seedCatalog } from "../seed/seedCatalog.js";
 import { hashToken, signAccessToken } from "../services/token.service.js";
 
 vi.mock("../services/email.service.js", () => ({
+  sendPasswordResetEmail: vi.fn(),
   sendVerificationEmail: vi.fn()
 }));
 
@@ -148,6 +149,63 @@ describe("auth routes", () => {
     expect(firstVerify.status).toBe(200);
     expect(secondVerify.status).toBe(200);
     expect(secondVerify.body.data.message).toBe("Email already verified.");
+  });
+
+  it("rejects signup passwords that do not meet complexity rules", async () => {
+    const signup = await request(app).post("/api/auth/signup").send({
+      name: "Weak Password",
+      email: "weak@example.com",
+      password: "password123"
+    });
+
+    expect(signup.status).toBe(400);
+    expect(signup.body.error.message).toContain("uppercase");
+  });
+
+  it("sends a recovery email and accepts a valid reset token", async () => {
+    const user = await createUser();
+
+    const forgot = await request(app).post("/api/auth/forgot-password").send({
+      email: user.email
+    });
+
+    expect(forgot.status).toBe(200);
+    expect(forgot.body.data.message).toContain("password reset link");
+
+    const updatedUser = await User.findById(user._id);
+    expect(updatedUser.resetPasswordToken).toEqual(expect.any(String));
+    expect(updatedUser.resetPasswordTokenExpires).toBeInstanceOf(Date);
+
+    const invalidReset = await request(app).post("/api/auth/reset-password").send({
+      token: "not-the-real-token",
+      password: "MoneySim456!"
+    });
+
+    expect(invalidReset.status).toBe(400);
+    expect(invalidReset.body.error.code).toBe("INVALID_TOKEN");
+
+    updatedUser.resetPasswordToken = hashToken("raw-reset-token");
+    updatedUser.resetPasswordTokenExpires = new Date(Date.now() + 60_000);
+    await updatedUser.save();
+
+    const reset = await request(app).post("/api/auth/reset-password").send({
+      token: "raw-reset-token",
+      password: "MoneySim456!"
+    });
+
+    expect(reset.status).toBe(200);
+
+    const oldLogin = await request(app).post("/api/auth/login").send({
+      email: user.email,
+      password: "MoneySim123!"
+    });
+    const newLogin = await request(app).post("/api/auth/login").send({
+      email: user.email,
+      password: "MoneySim456!"
+    });
+
+    expect(oldLogin.status).toBe(401);
+    expect(newLogin.status).toBe(200);
   });
 });
 
