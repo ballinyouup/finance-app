@@ -24,24 +24,6 @@ a {
   animation: page-enter 320ms ease-out;
 }
 
-details > summary {
-  list-style: none;
-}
-
-details > summary::-webkit-details-marker {
-  display: none;
-}
-
-details > summary::after {
-  content: "+";
-  float: right;
-  font-size: 1.1rem;
-}
-
-details[open] > summary::after {
-  content: "–";
-}
-
 @keyframes page-enter {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }

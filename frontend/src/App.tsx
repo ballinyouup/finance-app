@@ -18,23 +18,26 @@ import {
   useSearchParams,
 } from "react-router-dom"
 import {
-  Activity,
   ArrowRight,
   Banknote,
-  BatteryCharging,
   BriefcaseBusiness,
   ChartNoAxesColumnIncreasing,
   CircleDollarSign,
-  Heart,
   LogOut,
   Medal,
   Play,
   RefreshCw,
   Trophy,
-  Utensils,
   WalletCards,
 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionHeader,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -64,6 +67,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   Table,
   TableBody,
@@ -102,6 +110,21 @@ const startingMonthlyChoices: MonthlyChoices = {
   internship: false,
   debtPayment: 0,
 }
+
+const homeOptions = [
+  { id: "starter-condo", label: "Starter Condo", price: 30000, monthlyUpkeep: 180 },
+  { id: "townhome", label: "Townhome", price: 65000, monthlyUpkeep: 320 },
+  { id: "single-family", label: "Single-Family Home", price: 120000, monthlyUpkeep: 520 },
+  { id: "duplex", label: "Duplex", price: 180000, monthlyUpkeep: 760 },
+]
+
+const assetOptions = [
+  { id: "savings-bond", label: "Savings Bond", category: "Conservative", price: 1000 },
+  { id: "collectibles", label: "Collectibles", category: "Speculative", price: 2500 },
+  { id: "classic-car", label: "Classic Car", category: "Collectible", price: 8000 },
+  { id: "crypto", label: "Crypto Basket", category: "Speculative", price: 5000 },
+  { id: "small-business", label: "Small Business Stake", category: "Business", price: 15000 },
+]
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -851,15 +874,18 @@ function DashboardPage({ token }: { token: string }) {
     }
   }, [token])
 
-  const updateJob = useCallback(async function updateJob(jobId: string) {
+  const applyForJob = useCallback(async function applyForJob(jobId: string) {
     setBusy(true)
     setError(null)
 
     try {
-      const data = await api.changeJob(token, jobId)
+      const data = await api.applyForJob(token, jobId)
       setSession(data.session)
-    } catch (updateError) {
-      setError(getErrorMessage(updateError))
+      if (!data.application.accepted) {
+        setError(data.application.message)
+      }
+    } catch (applicationError) {
+      setError(getErrorMessage(applicationError))
     } finally {
       setBusy(false)
     }
@@ -899,14 +925,120 @@ function DashboardPage({ token }: { token: string }) {
     }
   }, [token])
 
-  const buyHome = useCallback(async function buyHome() {
+  const endRun = useCallback(async function endRun() {
+    setBusy(true)
+    setError(null)
+
+    try {
+      const data = await api.endRun(token)
+      setDeadSession(data.session)
+      setSession(null)
+    } catch (endError) {
+      setError(getErrorMessage(endError))
+    } finally {
+      setBusy(false)
+    }
+  }, [token])
+
+  const payOffDebt = useCallback(async function payOffDebt() {
     setBusy(true)
     setError(null)
     try {
-      const data = await api.buyHome(token)
+      const data = await api.payOffDebt(token)
       setSession(data.session)
-    } catch (buyError) {
-      setError(getErrorMessage(buyError))
+    } catch (payError) {
+      setError(getErrorMessage(payError))
+    } finally {
+      setBusy(false)
+    }
+  }, [token])
+
+  const investStocks = useCallback(async function investStocks(amount: number) {
+    setBusy(true)
+    setError(null)
+    try {
+      const data = await api.investStocks(token, amount)
+      setSession(data.session)
+    } catch (investError) {
+      setError(getErrorMessage(investError))
+    } finally {
+      setBusy(false)
+    }
+  }, [token])
+
+  const sellStocks = useCallback(async function sellStocks() {
+    setBusy(true)
+    setError(null)
+    try {
+      const data = await api.sellStocks(token)
+      setSession(data.session)
+    } catch (sellError) {
+      setError(getErrorMessage(sellError))
+    } finally {
+      setBusy(false)
+    }
+  }, [token])
+
+  const buyHomeType = useCallback(async function buyHomeType(homeId: string) {
+    setBusy(true)
+    setError(null)
+    try {
+      const data = await api.buyHomeType(token, homeId)
+      setSession(data.session)
+    } catch (homeError) {
+      setError(getErrorMessage(homeError))
+    } finally {
+      setBusy(false)
+    }
+  }, [token])
+
+  const sellHome = useCallback(async function sellHome() {
+    setBusy(true)
+    setError(null)
+    try {
+      const data = await api.sellHome(token)
+      setSession(data.session)
+    } catch (homeError) {
+      setError(getErrorMessage(homeError))
+    } finally {
+      setBusy(false)
+    }
+  }, [token])
+
+  const buyAsset = useCallback(async function buyAsset(assetId: string) {
+    setBusy(true)
+    setError(null)
+    try {
+      const data = await api.buyAsset(token, assetId)
+      setSession(data.session)
+    } catch (assetError) {
+      setError(getErrorMessage(assetError))
+    } finally {
+      setBusy(false)
+    }
+  }, [token])
+
+  const sellAsset = useCallback(async function sellAsset(holdingId: string) {
+    setBusy(true)
+    setError(null)
+    try {
+      const data = await api.sellAsset(token, holdingId)
+      setSession(data.session)
+    } catch (assetError) {
+      setError(getErrorMessage(assetError))
+    } finally {
+      setBusy(false)
+    }
+  }, [token])
+
+  const sellCar = useCallback(async function sellCar() {
+    setBusy(true)
+    setError(null)
+    try {
+      const data = await api.sellCar(token)
+      setSession(data.session)
+    } catch (carError) {
+      setError(getErrorMessage(carError))
     } finally {
       setBusy(false)
     }
@@ -977,10 +1109,18 @@ function DashboardPage({ token }: { token: string }) {
           optionsByCategory={optionsByCategory}
           session={session}
           onAdvance={advanceMonths}
-          onBuyHome={buyHome}
+          onEndRun={endRun}
+          onPayOffDebt={payOffDebt}
+          onInvestStocks={investStocks}
+          onSellStocks={sellStocks}
+          onBuyHomeType={buyHomeType}
+          onSellHome={sellHome}
+          onBuyAsset={buyAsset}
+          onSellAsset={sellAsset}
+          onSellCar={sellCar}
           onEnrollCollege={enrollCollege}
           onChangeExpense={updateExpense}
-          onChangeJob={updateJob}
+          onApplyForJob={applyForJob}
         />
       ) : (
         <StartRunPanel
@@ -1169,9 +1309,17 @@ const ActiveSession = memo(function ActiveSession({
   optionsByCategory,
   busy,
   onAdvance,
-  onChangeJob,
+  onEndRun,
+  onApplyForJob,
   onChangeExpense,
-  onBuyHome,
+  onPayOffDebt,
+  onInvestStocks,
+  onSellStocks,
+  onBuyHomeType,
+  onSellHome,
+  onBuyAsset,
+  onSellAsset,
+  onSellCar,
   onEnrollCollege,
 }: {
   session: GameSession
@@ -1179,159 +1327,29 @@ const ActiveSession = memo(function ActiveSession({
   optionsByCategory: Record<ExpenseCategory, ExpenseOption[]>
   busy: boolean
   onAdvance: (months: number, choices: MonthlyChoices) => void
-  onChangeJob: (jobId: string) => void
+  onEndRun: () => void
+  onApplyForJob: (jobId: string) => void
   onChangeExpense: (category: MonthlyExpenseCategory, optionId: string) => void
-  onBuyHome: () => void
+  onPayOffDebt: () => void
+  onInvestStocks: (amount: number) => void
+  onSellStocks: () => void
+  onBuyHomeType: (homeId: string) => void
+  onSellHome: () => void
+  onBuyAsset: (assetId: string) => void
+  onSellAsset: (holdingId: string) => void
+  onSellCar: () => void
   onEnrollCollege: (major: Major) => void
 }) {
   const expenseTotal = useMemo(() => sumSelectedExpenses(session), [session])
   const selectedExpenseIds = useMemo(() => selectedIds(session), [session])
-  const eligibleJobs = useMemo(
-    () =>
-      jobs.filter(
-        (job) =>
-          !job.requiresDegree ||
-          (session.lifePath === "college" && session.educationMonths >= 48),
-      ),
-    [jobs, session.educationMonths, session.lifePath],
-  )
-  const [choices, setChoices] = useState<MonthlyChoices>(
-    { ...startingMonthlyChoices, ...session.monthlyChoices },
-  )
   const lastHistory = session.history.at(-1)
-  const ageYears = Math.floor(session.ageMonths / 12)
-  const ageRemainderMonths = session.ageMonths % 12
-  const foodCost = choices.foodDays * 13
-  const entertainmentCost = choices.entertainmentDays * 18
-  const datingCost = choices.datingDays * 38
-  const projectedVariable = foodCost + entertainmentCost + datingCost
 
   return (
-    <div className="grid gap-8">
-      <section className="grid gap-4">
-        <div className="grid gap-0.5 pl-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Your Life</p>
-          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Overview</h2>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-        <StatCard
-          label="Age"
-          value={`${ageYears}y ${ageRemainderMonths}m`}
-          note={`Month ${session.currentMonth}`}
-        />
-        <StatCard label="Current Balance" value={money(session.balance)} />
-        <StatCard
-          label="Student Debt"
-          value={money(session.studentDebt)}
-          note={session.lifePath === "college" ? `${session.educationMonths} college months` : "Not enrolled"}
-        />
-        </div>
-      </section>
-
-      <section className="grid gap-4">
-        <div className="grid gap-0.5 pl-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Work and Expenses</p>
-          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Career and Commitments</h2>
-        </div>
-
-      <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Job</CardTitle>
-            <CardDescription>
-              {session.lifePath === "college" && session.educationMonths < 48
-                ? `${session.currentJobId.title} is your part-time job while enrolled.`
-                : `${session.currentJobId.title} is your current job.`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChangeJobDialog
-              busy={busy}
-              jobs={eligibleJobs}
-              value={session.currentJobId._id}
-              onChangeJob={onChangeJob}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly commitments</CardTitle>
-            <CardDescription>
-              Housing and transportation: {money(expenseTotal)}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ExpensePickerGrid
-              optionsByCategory={optionsByCategory}
-              selections={selectedExpenseIds}
-              onChange={onChangeExpense}
-              disabled={busy}
-            />
-          </CardContent>
-        </Card>
+    <div className="grid gap-4">
+      <LifeStatusPanel session={session} fixedExpenses={expenseTotal} />
+      <div className="flex justify-end">
+        <EndRunDialog busy={busy} onEndRun={onEndRun} />
       </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard
-          label="Career"
-          value={`${session.currentJobId.careerTrack} · Level ${session.careerLevel ?? 0}`}
-          note={session.unemployedMonths ? "Between jobs this month" : `${session.careerPerformance ?? 0}/100 toward promotion`}
-        />
-        <StatCard
-          label="Skills"
-          value={`Tech ${session.skills?.technical ?? 0} · Business ${session.skills?.business ?? 0}`}
-          note={`Communication ${session.skills?.communication ?? 0}/10`}
-        />
-        <StatCard
-          label="Home"
-          value={session.homeOwned ? "Homeowner" : "Renting"}
-          note={session.homeOwned ? "Home goal complete" : "Save $30,000 to buy"}
-        />
-      </div>
-      </section>
-
-      <section className="grid gap-4">
-        <div className="grid gap-0.5 pl-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Monthly Preview</p>
-          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">This Month</h2>
-        </div>
-
-      <MonthForecast
-        session={session}
-        fixedExpenses={expenseTotal}
-        variableExpenses={projectedVariable}
-        debtPayment={choices.debtPayment}
-      />
-      </section>
-
-      <section className="grid gap-4">
-        <div className="grid gap-0.5 pl-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Personal Growth</p>
-          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Education</h2>
-        </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Education</CardTitle>
-          <CardDescription>
-            {session.lifePath === "college"
-              ? `${session.major?.replace("-", " ") ?? "College"} · ${session.educationMonths}/48 months completed`
-              : "Enroll at any time to build new skills and unlock degree-required careers."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {session.lifePath === "college" ? (
-            <Badge variant={session.educationMonths >= 48 ? "default" : "secondary"}>
-              {session.educationMonths >= 48 ? "Graduated" : `${48 - session.educationMonths} months to graduation`}
-            </Badge>
-          ) : (
-            <EnrollCollegeDialog busy={busy} onEnroll={onEnrollCollege} />
-          )}
-        </CardContent>
-      </Card>
-      </section>
 
       {lastHistory?.eventTitle ? (
         <Alert>
@@ -1345,64 +1363,237 @@ const ActiveSession = memo(function ActiveSession({
         </Alert>
       ) : null}
 
-      <section className="grid gap-4">
-        <div className="grid gap-0.5 pl-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Progress</p>
-          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Goals</h2>
+      <MonthlyPlanPanel
+        busy={busy}
+        fixedExpenses={expenseTotal}
+        session={session}
+        onAdvance={onAdvance}
+      />
+
+      <NeedsPanel session={session} />
+      <NextStepsPanel session={session} jobs={jobs} />
+
+      <Accordion multiple defaultValue={[]}>
+        <AccordionSection
+          title="Career and Commitments"
+          value="career"
+          summary={`Primary: ${session.currentJobId.title} · ${money(expenseTotal)} fixed`}
+        >
+          <div className="grid gap-4">
+            <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="grid gap-2">
+                <p className="font-semibold">Primary job</p>
+                <p className="text-muted-foreground">
+                  {session.lifePath === "college" && session.educationMonths < 48
+                    ? `${session.currentJobId.title} is your part-time job while enrolled.`
+                    : `${session.currentJobId.title} is your current job.`}
+                </p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <CompactMetric label="Career" value={`${session.currentJobId.careerTrack} · L${session.careerLevel ?? 0}`} />
+                  <CompactMetric label="Performance" value={session.unemployedMonths ? "Between jobs" : `${session.careerPerformance ?? 0}/100`} />
+                  <CompactMetric label="Home" value={session.homeOwned ? "Owned" : "Renting"} />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <p className="font-semibold">Monthly commitments</p>
+                <p className="text-sm text-muted-foreground">
+                  Higher tiers cost more but improve monthly needs.
+                </p>
+                <ExpensePickerGrid
+                  optionsByCategory={optionsByCategory}
+                  selections={selectedExpenseIds}
+                  session={session}
+                  onChange={onChangeExpense}
+                  disabled={busy}
+                />
+              </div>
+            </div>
+            <JobMarket
+              busy={busy}
+              session={session}
+              onApplyForJob={onApplyForJob}
+            />
+          </div>
+        </AccordionSection>
+
+        <AccordionSection
+          title="Assets and Debt"
+          value="assets"
+          summary={`Net assets: ${money(getAssetValue(session))} · Debt: ${money(session.studentDebt)}`}
+        >
+          <AssetsAndDebtPanel
+            busy={busy}
+            session={session}
+            onBuyAsset={onBuyAsset}
+            onBuyHomeType={onBuyHomeType}
+            onInvestStocks={onInvestStocks}
+            onPayOffDebt={onPayOffDebt}
+            onSellAsset={onSellAsset}
+            onSellCar={onSellCar}
+            onSellHome={onSellHome}
+            onSellStocks={onSellStocks}
+          />
+        </AccordionSection>
+
+        <AccordionSection
+          title="Education and Goals"
+          value="education"
+          summary={session.lifePath === "college" ? `${session.educationMonths}/48 college months` : "Not enrolled"}
+        >
+          <div className="grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
+            <div className="grid gap-2">
+              <p className="font-semibold">Education</p>
+              <p className="text-muted-foreground">
+                {session.lifePath === "college"
+                  ? `${session.major?.replace("-", " ") ?? "College"} · ${session.educationMonths}/48 months completed`
+                  : "Enroll at any time to build new skills and unlock degree-required careers."}
+              </p>
+              {session.lifePath === "college" ? (
+                <Badge className="w-fit" variant={session.educationMonths >= 48 ? "default" : "secondary"}>
+                  {session.educationMonths >= 48 ? "Graduated" : `${48 - session.educationMonths} months to graduation`}
+                </Badge>
+              ) : (
+                <EnrollCollegeDialog busy={busy} onEnroll={onEnrollCollege} />
+              )}
+            </div>
+            <div className="grid content-start gap-2">
+              <p className="font-semibold">Goals</p>
+              <div className="flex flex-wrap gap-2">
+                {["Save $10,000", "Graduate debt-free", "Reach age 40", "Buy a home"].map((goal) => (
+                  <Badge key={goal} variant={session.completedGoals?.includes(goal) ? "default" : "secondary"}>
+                    {session.completedGoals?.includes(goal) ? "Done: " : ""}{goal}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+        </AccordionSection>
+
+        <AccordionSection
+          title="History"
+          value="history"
+          summary={`${session.history.length} months recorded`}
+        >
+          <HistoryTable session={session} />
+        </AccordionSection>
+      </Accordion>
+    </div>
+  )
+})
+
+function AccordionSection({
+  title,
+  value,
+  summary,
+  children,
+}: {
+  title: string
+  value: string
+  summary: string
+  children: ReactNode
+}) {
+  return (
+    <AccordionItem value={value}>
+      <AccordionHeader>
+        <AccordionTrigger>
+          <span className="grid min-w-0 gap-0.5">
+            <span>{title}</span>
+            <span className="truncate text-xs font-normal text-muted-foreground">
+              {summary}
+            </span>
+          </span>
+        </AccordionTrigger>
+      </AccordionHeader>
+      <AccordionContent>{children}</AccordionContent>
+    </AccordionItem>
+  )
+}
+
+const LifeStatusPanel = memo(function LifeStatusPanel({
+  session,
+  fixedExpenses,
+}: {
+  session: GameSession
+  fixedExpenses: number
+}) {
+  const ageYears = Math.floor(session.ageMonths / 12)
+  const ageRemainderMonths = session.ageMonths % 12
+
+  return (
+    <Card className="border-primary/20 bg-background">
+      <CardContent className="grid gap-3 p-4 sm:grid-cols-[1.4fr_repeat(3,0.75fr)] sm:items-center">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-lg font-semibold text-white">
+            {ageYears}
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+              Month {session.currentMonth}
+            </p>
+            <p className="truncate text-xl font-semibold">
+              Age {ageYears}y {ageRemainderMonths}m
+            </p>
+            <p className="truncate text-sm text-muted-foreground">
+              {session.currentJobId.title}
+            </p>
+          </div>
         </div>
+        <CompactMetric label="Balance" value={money(session.balance)} />
+        <CompactMetric label="Debt" value={money(session.studentDebt)} />
+        <CompactMetric label="Fixed Costs" value={money(fixedExpenses)} />
+      </CardContent>
+    </Card>
+  )
+})
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Goals</CardTitle>
-          <CardDescription>Build a life you are proud of. Completed goals improve your final score.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {["Save $10,000", "Graduate debt-free", "Reach age 40", "Buy a home"].map((goal) => (
-            <Badge key={goal} variant={session.completedGoals?.includes(goal) ? "default" : "secondary"}>
-              {session.completedGoals?.includes(goal) ? "✓ " : "○ "}{goal}
-            </Badge>
-          ))}
-          {!session.homeOwned ? (
-            <Button variant="outline" disabled={busy || session.balance < 30000} onClick={onBuyHome}>
-              Buy Home ({money(30000)})
-            </Button>
-          ) : null}
-        </CardContent>
-      </Card>
-      </section>
+const MonthlyPlanPanel = memo(function MonthlyPlanPanel({
+  session,
+  fixedExpenses,
+  busy,
+  onAdvance,
+}: {
+  session: GameSession
+  fixedExpenses: number
+  busy: boolean
+  onAdvance: (months: number, choices: MonthlyChoices) => void
+}) {
+  const [choices, setChoices] = useState<MonthlyChoices>(
+    { ...startingMonthlyChoices, ...session.monthlyChoices },
+  )
+  const foodCost = choices.foodDays * 13
+  const entertainmentCost = choices.entertainmentDays * 18
+  const datingCost = choices.datingDays * 38
+  const variableExpenses = foodCost + entertainmentCost + datingCost
+  const enrolled = session.lifePath === "college" && session.educationMonths < 48
+  const graduated = session.lifePath === "college" && session.educationMonths >= 48
+  const income = session.unemployedMonths
+    ? 0
+    : session.currentJobId.monthlySalary * (1 + (session.careerLevel ?? 0) * 0.12) * (enrolled ? 0.35 : graduated ? 1.55 : 1)
+  const expenses = fixedExpenses + variableExpenses + choices.debtPayment
+  const projectedChange = income - expenses
 
-      <section className="grid gap-4">
-        <div className="grid gap-0.5 pl-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Wellbeing</p>
-          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Needs</h2>
+  return (
+    <Card className="border-primary/40 bg-gradient-to-br from-card to-emerald-50/70 shadow-sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <RefreshCw className="size-5" aria-hidden="true" />
+          Monthly Plan
+        </CardTitle>
+        <CardDescription>
+          Set this month’s choices, then advance when ready.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        <div className="grid gap-2 sm:grid-cols-4">
+          <ForecastItem label="Income" value={money(income)} tone="text-emerald-700" />
+          <ForecastItem label="Spending" value={money(expenses)} tone="text-amber-700" />
+          <ForecastItem label="Change" value={`${projectedChange >= 0 ? "+" : ""}${money(projectedChange)}`} tone={projectedChange >= 0 ? "text-emerald-700" : "text-red-700"} />
+          <ForecastItem label="After" value={money(session.balance + projectedChange)} tone="text-foreground" />
         </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <NeedCard label="Happiness" value={session.needs.happiness} />
-        <NeedCard label="Hunger" value={session.needs.hunger} />
-        <NeedCard label="Entertainment" value={session.needs.entertainment} />
-        <NeedCard label="Love" value={session.needs.love} />
-        <NeedCard label="Energy" value={session.needs.energy ?? 70} />
-      </div>
-      </section>
-
-      <section className="grid gap-4">
-        <div className="grid gap-0.5 pl-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Make Your Choices</p>
-          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Monthly Plan</h2>
-        </div>
-
-      <Card className="border-primary/40 bg-gradient-to-br from-card to-emerald-50/70 shadow-sm">
-        <CardHeader>
-          <CardTitle>Monthly plan</CardTitle>
-          <CardDescription>
-            Food, entertainment, and dating are daily choices inside the month. You can skip eating, but hunger and death risk will move.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
+        <div className="grid gap-3 lg:grid-cols-[1fr_1.1fr]">
           <div className="grid gap-2">
-            <Label>Focus activity</Label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Label>Focus</Label>
+            <div className="grid grid-cols-2 gap-2">
               {([
                 ["study", "Study"],
                 ["exercise", "Exercise"],
@@ -1420,42 +1611,26 @@ const ActiveSession = memo(function ActiveSession({
                 </Button>
               ))}
             </div>
-            <p className="text-sm text-muted-foreground">
-              Choose one activity for the month. It changes your energy and wellbeing when you advance.
-            </p>
+            {session.lifePath === "college" && session.educationMonths < 48 ? (
+              <Button
+                type="button"
+                variant={choices.internship ? "default" : "outline"}
+                disabled={busy}
+                onClick={() => setChoices((current) => ({ ...current, internship: !current.internship }))}
+              >
+                {choices.internship ? "Internship selected" : "Take internship"}
+              </Button>
+            ) : null}
           </div>
-          {session.lifePath === "college" && session.educationMonths < 48 ? (
-            <Button
-              type="button"
-              variant={choices.internship ? "default" : "outline"}
-              disabled={busy}
-              onClick={() => setChoices((current) => ({ ...current, internship: !current.internship }))}
-            >
-              {choices.internship ? "Internship selected (+$550, major skill)" : "Take an internship (+$550, major skill)"}
-            </Button>
-          ) : null}
-          {session.studentDebt > 0 ? (
-            <div className="grid gap-2">
-              <Label htmlFor="debt-payment">Student-loan payment this month</Label>
-              <Input
-                id="debt-payment"
-                type="number"
-                min={0}
-                max={2000}
-                value={choices.debtPayment}
-                onChange={(event) => setChoices((current) => ({ ...current, debtPayment: Math.max(0, Math.min(2000, Number(event.target.value) || 0)) }))}
-              />
-            </div>
-          ) : null}
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             <MonthlyChoiceInput
-              label="Days eating"
+              label="Food days"
               value={choices.foodDays}
               cost={foodCost}
               onChange={(foodDays) => setChoices((current) => ({ ...current, foodDays }))}
             />
             <MonthlyChoiceInput
-              label="Entertainment days"
+              label="Fun days"
               value={choices.entertainmentDays}
               cost={entertainmentCost}
               onChange={(entertainmentDays) =>
@@ -1469,78 +1644,97 @@ const ActiveSession = memo(function ActiveSession({
               onChange={(datingDays) => setChoices((current) => ({ ...current, datingDays }))}
             />
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Planned variable spending: {money(projectedVariable)}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button size="lg" disabled={busy} onClick={() => onAdvance(1, choices)}>
-                <RefreshCw className="size-4" aria-hidden="true" />
-                {busy ? "Advancing..." : "Advance Month"}
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                disabled={busy}
-                onClick={() => onAdvance(12, choices)}
-              >
-                Advance Year
-              </Button>
-            </div>
+        </div>
+        {session.studentDebt > 0 ? (
+          <div className="grid gap-2 sm:max-w-xs">
+            <Label htmlFor="debt-payment">Loan payment</Label>
+            <Input
+              id="debt-payment"
+              type="number"
+              min={0}
+              max={2000}
+              value={choices.debtPayment}
+              onChange={(event) => setChoices((current) => ({ ...current, debtPayment: Math.max(0, Math.min(2000, Number(event.target.value) || 0)) }))}
+            />
           </div>
-        </CardContent>
-      </Card>
-      </section>
-
-      <section className="grid gap-4">
-        <div className="grid gap-0.5 pl-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">What Comes Next</p>
-          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">Next Steps</h2>
+        ) : null}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Button size="lg" disabled={busy} onClick={() => onAdvance(1, choices)}>
+            <RefreshCw className="size-4" aria-hidden="true" />
+            {busy ? "Advancing..." : "Advance Month"}
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            disabled={busy}
+            onClick={() => onAdvance(12, choices)}
+          >
+            Advance Year
+          </Button>
         </div>
-        <NextSteps session={session} jobs={jobs} />
-      </section>
-
-      <section className="grid gap-4">
-        <div className="grid gap-0.5 pl-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Your Timeline</p>
-          <h2 className="text-2xl font-semibold tracking-normal sm:text-3xl">History</h2>
-        </div>
-        <HistoryTable session={session} />
-      </section>
-    </div>
+      </CardContent>
+    </Card>
   )
 })
 
-const MonthForecast = memo(function MonthForecast({
-  session,
-  fixedExpenses,
-  variableExpenses,
-  debtPayment,
-}: {
-  session: GameSession
-  fixedExpenses: number
-  variableExpenses: number
-  debtPayment: number
-}) {
-  const enrolled = session.lifePath === "college" && session.educationMonths < 48
-  const graduated = session.lifePath === "college" && session.educationMonths >= 48
-  const income = session.unemployedMonths
-    ? 0
-    : session.currentJobId.monthlySalary * (1 + (session.careerLevel ?? 0) * 0.12) * (enrolled ? 0.35 : graduated ? 1.55 : 1)
-  const expenses = fixedExpenses + variableExpenses + debtPayment
-  const projectedChange = income - expenses
+function CompactMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-background px-3 py-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="truncate font-semibold">{value}</p>
+    </div>
+  )
+}
+
+function NeedMeter({ label, value }: { label: string; value: number }) {
+  const rounded = Math.round(value)
+  const barColor = rounded < 25 ? "bg-red-500" : rounded < 50 ? "bg-amber-500" : "bg-emerald-600"
 
   return (
-    <Card className="border-emerald-700/20 bg-emerald-50/35">
+    <div className="grid grid-cols-[7rem_1fr_3rem] items-center gap-3 rounded-lg border bg-background px-3 py-2">
+      <p className="font-medium">{label}</p>
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full ${barColor}`}
+          style={{ width: `${Math.max(0, Math.min(100, rounded))}%` }}
+        />
+      </div>
+      <p className="text-right font-semibold">{rounded}</p>
+    </div>
+  )
+}
+
+const NeedsPanel = memo(function NeedsPanel({ session }: { session: GameSession }) {
+  return (
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><CircleDollarSign className="size-5" /> This month</CardTitle>
-        <CardDescription>Review the forecast before you advance.</CardDescription>
+        <CardTitle>Needs</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-4">
-        <ForecastItem label="Income" value={money(income)} tone="text-emerald-700" />
-        <ForecastItem label="Planned spending" value={money(expenses)} tone="text-amber-700" />
-        <ForecastItem label="Projected change" value={`${projectedChange >= 0 ? "+" : ""}${money(projectedChange)}`} tone={projectedChange >= 0 ? "text-emerald-700" : "text-red-700"} />
-        <ForecastItem label="Balance after" value={money(session.balance + projectedChange)} tone="text-foreground" />
+      <CardContent className="grid gap-2 sm:grid-cols-2">
+        <NeedMeter label="Happiness" value={session.needs.happiness} />
+        <NeedMeter label="Hunger" value={session.needs.hunger} />
+        <NeedMeter label="Entertainment" value={session.needs.entertainment} />
+        <NeedMeter label="Love" value={session.needs.love} />
+        <NeedMeter label="Energy" value={session.needs.energy ?? 70} />
+      </CardContent>
+    </Card>
+  )
+})
+
+const NextStepsPanel = memo(function NextStepsPanel({
+  session,
+  jobs,
+}: {
+  session: GameSession
+  jobs: Job[]
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Next Steps</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <NextSteps session={session} jobs={jobs} />
       </CardContent>
     </Card>
   )
@@ -1554,17 +1748,198 @@ const NextSteps = memo(function NextSteps({ session, jobs }: { session: GameSess
   const tips = useMemo(() => getGameTips(session, jobs), [jobs, session])
 
   return (
-    <Card className="border-primary/20">
-      <CardHeader>
-        <CardTitle>Next steps</CardTitle>
-        <CardDescription>Personalized suggestions based on your current life.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ul className="grid gap-2 text-sm">
-          {tips.map((tip) => <li key={tip} className="rounded-md bg-muted px-3 py-2">{tip}</li>)}
-        </ul>
-      </CardContent>
-    </Card>
+    <ul className="grid gap-2">
+      {tips.map((tip) => <li key={tip} className="rounded-md bg-muted px-3 py-2">{tip}</li>)}
+    </ul>
+  )
+})
+
+const AssetsAndDebtPanel = memo(function AssetsAndDebtPanel({
+  busy,
+  session,
+  onBuyAsset,
+  onBuyHomeType,
+  onInvestStocks,
+  onPayOffDebt,
+  onSellAsset,
+  onSellCar,
+  onSellHome,
+  onSellStocks,
+}: {
+  busy: boolean
+  session: GameSession
+  onBuyAsset: (assetId: string) => void
+  onBuyHomeType: (homeId: string) => void
+  onInvestStocks: (amount: number) => void
+  onPayOffDebt: () => void
+  onSellAsset: (holdingId: string) => void
+  onSellCar: () => void
+  onSellHome: () => void
+  onSellStocks: () => void
+}) {
+  const [stockAmount, setStockAmount] = useState(500)
+  const [homeId, setHomeId] = useState(homeOptions[0].id)
+  const [assetId, setAssetId] = useState(assetOptions[0].id)
+  const selectedHome = homeOptions.find((home) => home.id === homeId) ?? homeOptions[0]
+  const selectedAsset = assetOptions.find((asset) => asset.id === assetId) ?? assetOptions[0]
+  const stockValue = session.stockPortfolio?.value ?? 0
+  const stockInvested = session.stockPortfolio?.invested ?? 0
+  const canSellCar = session.vehicleStatus?.type === "used-car"
+
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-2 md:grid-cols-3">
+        <CompactMetric label="Cash" value={money(session.balance)} />
+        <CompactMetric label="Asset Value" value={money(getAssetValue(session))} />
+        <CompactMetric label="Student Debt" value={money(session.studentDebt)} />
+      </div>
+
+      <div className="grid gap-3 rounded-lg border bg-background p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="font-semibold">Student debt</p>
+            <p className="text-sm text-muted-foreground">Pay the full balance from cash.</p>
+          </div>
+          <Button disabled={busy || session.studentDebt <= 0 || session.balance < session.studentDebt} onClick={onPayOffDebt}>
+            Pay Off All
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 rounded-lg border bg-background p-3">
+        <div>
+          <p className="font-semibold">Stock market</p>
+          <p className="text-sm text-muted-foreground">
+            Invested {money(stockInvested)} · Current value {money(stockValue)}
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+          <Input
+            min={1}
+            type="number"
+            value={stockAmount}
+            onChange={(event) => setStockAmount(Math.max(1, Number(event.target.value) || 1))}
+          />
+          <Button disabled={busy || stockAmount > session.balance} onClick={() => onInvestStocks(stockAmount)}>
+            Invest
+          </Button>
+          <Button disabled={busy || stockValue <= 0} variant="outline" onClick={onSellStocks}>
+            Sell Stocks
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 rounded-lg border bg-background p-3">
+        <div>
+          <p className="font-semibold">Home</p>
+          <p className="text-sm text-muted-foreground">
+            {session.ownedHome
+              ? `${session.ownedHome.label} · value ${money(session.ownedHome.estimatedValue)} · upkeep ${money(session.ownedHome.monthlyUpkeep)}/mo`
+              : "Buy a home outright. Values can rise or fall each month."}
+          </p>
+        </div>
+        {session.ownedHome ? (
+          <Button className="w-fit" disabled={busy} variant="outline" onClick={onSellHome}>
+            Sell Home
+          </Button>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Select
+              items={homeOptions.map((home) => ({
+                label: `${home.label} · ${money(home.price)}`,
+                value: home.id,
+              }))}
+              value={homeId}
+              onValueChange={(value) => value && setHomeId(value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {homeOptions.map((home) => (
+                    <SelectItem key={home.id} value={home.id}>
+                      {home.label} · {money(home.price)} · upkeep {money(home.monthlyUpkeep)}/mo
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Button disabled={busy || selectedHome.price > session.balance} onClick={() => onBuyHomeType(homeId)}>
+              Buy Home
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-3 rounded-lg border bg-background p-3">
+        <div>
+          <p className="font-semibold">Car</p>
+          <p className="text-sm text-muted-foreground">
+            {session.vehicleStatus?.type === "used-car"
+              ? `Used car · condition ${Math.round(session.vehicleStatus.condition)}% · ${Math.round(session.vehicleStatus.mileage).toLocaleString()} miles`
+              : session.vehicleStatus?.type === "new-car"
+                ? "New car lease. Leased cars cannot be sold."
+                : "No car owned."}
+          </p>
+        </div>
+        <Button className="w-fit" disabled={busy || !canSellCar} variant="outline" onClick={onSellCar}>
+          Sell Used Car
+        </Button>
+      </div>
+
+      <div className="grid gap-3 rounded-lg border bg-background p-3">
+        <div>
+          <p className="font-semibold">Other assets</p>
+          <p className="text-sm text-muted-foreground">
+            Assets can appreciate or depreciate each month.
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <Select
+            items={assetOptions.map((asset) => ({
+              label: `${asset.label} · ${money(asset.price)}`,
+              value: asset.id,
+            }))}
+            value={assetId}
+            onValueChange={(value) => value && setAssetId(value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {assetOptions.map((asset) => (
+                  <SelectItem key={asset.id} value={asset.id}>
+                    {asset.label} · {asset.category} · {money(asset.price)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Button disabled={busy || selectedAsset.price > session.balance} onClick={() => onBuyAsset(assetId)}>
+            Buy Asset
+          </Button>
+        </div>
+        {session.assetHoldings?.length ? (
+          <div className="grid gap-2">
+            {session.assetHoldings.map((asset) => (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2" key={asset._id}>
+                <p className="text-sm">
+                  <span className="font-medium">{asset.label}</span>{" "}
+                  <span className="text-muted-foreground">
+                    value {money(asset.estimatedValue)} · bought {money(asset.purchasePrice)}
+                  </span>
+                </p>
+                <Button size="sm" disabled={busy} variant="outline" onClick={() => onSellAsset(asset._id)}>
+                  Sell
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
   )
 })
 
@@ -1587,76 +1962,75 @@ function ResultsScreen({
 }) {
   const ageYears = Math.floor(session.ageMonths / 12)
   const ageRemainderMonths = session.ageMonths % 12
+  const recap = session.deathRecap
+  const lastRound = session.history.at(-1)
+  const chance = recap?.chance ?? lastRound?.deathChance ?? 0
+  const roll = recap?.roll
+  const endedByPlayer = recap?.eventTitle === "Run ended by player"
+  const assetValue = recap?.assetValue ?? getAssetValue(session)
+  const netWorth = session.balance + assetValue - session.studentDebt
 
   return (
-    <Card className="border-emerald-700/20">
+    <Card className="border-destructive/30">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Medal className="size-5 text-emerald-700" aria-hidden="true" />
-          Life Ended
+          <Medal className="size-5 text-destructive" aria-hidden="true" />
+          {endedByPlayer ? "Run Recap" : "Death Recap"}
         </CardTitle>
         <CardDescription>
-          Age {ageYears}y {ageRemainderMonths}m · Final score:{" "}
-          {money(session.finalScore ?? session.balance)} · Cash: {money(session.balance)} ·
-          Debt: {money(session.studentDebt)}
+          Age {ageYears}y {ageRemainderMonths}m · {recap?.reason ?? session.deathReason ?? "Your run ended."}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-3">
-        <Link className={buttonVariants()} to="/leaderboard">
-          View Leaderboard
-        </Link>
-        <Button
-          variant="outline"
-          disabled={busy || !jobs[0]}
-          onClick={() =>
-            onPlayAgain("work", jobs[0]._id, defaultSelections(optionsByCategory))
-          }
-        >
-          Play Again
-        </Button>
+      <CardContent className="grid gap-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <CompactMetric label="Final Score" value={money(session.finalScore ?? session.balance)} />
+          <CompactMetric label="Net Worth" value={money(netWorth)} />
+          <CompactMetric label="Cash" value={money(session.balance)} />
+          <CompactMetric label="Assets" value={money(assetValue)} />
+          <CompactMetric label="Student Debt" value={money(session.studentDebt)} />
+          <CompactMetric label="Job" value={recap?.jobTitle ?? session.currentJobId.title} />
+          <CompactMetric label="Death Chance" value={endedByPlayer ? "Manual end" : `${(chance * 100).toFixed(3)}%`} />
+          <CompactMetric label="Roll" value={endedByPlayer ? "N/A" : roll == null ? "Unknown" : `${(roll * 100).toFixed(3)}%`} />
+        </div>
+
+        {lastRound ? (
+          <div className="grid gap-2 rounded-lg border bg-background p-3">
+            <p className="font-semibold">Last month</p>
+            <p className="text-sm text-muted-foreground">
+              Income {money(lastRound.income)} · Expenses {money(lastRound.expenses)} · Balance after {money(lastRound.balanceAfter)}
+            </p>
+            {lastRound.eventTitle ? (
+              <p className="text-sm text-muted-foreground">Event: {lastRound.eventTitle}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {recap?.needs ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <NeedMeter label="Happiness" value={recap.needs.happiness} />
+            <NeedMeter label="Hunger" value={recap.needs.hunger} />
+            <NeedMeter label="Entertainment" value={recap.needs.entertainment} />
+            <NeedMeter label="Love" value={recap.needs.love} />
+            <NeedMeter label="Energy" value={recap.needs.energy ?? 70} />
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap gap-3">
+          <Link className={buttonVariants()} to="/leaderboard">
+            View Leaderboard
+          </Link>
+          <Button
+            variant="outline"
+            disabled={busy || !jobs[0]}
+            onClick={() =>
+              onPlayAgain("work", jobs[0]._id, defaultSelections(optionsByCategory))
+            }
+          >
+            Play Again
+          </Button>
+        </div>
       </CardContent>
     </Card>
-  )
-}
-
-function ChangeJobDialog({
-  jobs,
-  value,
-  busy,
-  onChangeJob,
-}: {
-  jobs: Job[]
-  value: string
-  busy: boolean
-  onChangeJob: (jobId: string) => void
-}) {
-  const [draft, setDraft] = useState(value)
-  const [open, setOpen] = useState(false)
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" />}>Change Job</DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Change job</DialogTitle>
-          <DialogDescription>
-            Degree-required roles unlock after graduating from college.
-          </DialogDescription>
-        </DialogHeader>
-        <JobSelect jobs={jobs} value={draft} onValueChange={setDraft} />
-        <DialogFooter>
-          <Button
-            disabled={busy}
-            onClick={() => {
-              onChangeJob(draft)
-              setOpen(false)
-            }}
-          >
-            Confirm Job
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
 
@@ -1709,6 +2083,127 @@ function EnrollCollegeDialog({ busy, onEnroll }: { busy: boolean; onEnroll: (maj
   )
 }
 
+function EndRunDialog({ busy, onEndRun }: { busy: boolean; onEndRun: () => void }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button variant="destructive" />}>End Run</DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>End this run?</DialogTitle>
+          <DialogDescription>
+            This will finalize your score, save a recap, and let you start over.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Keep Playing
+          </Button>
+          <Button
+            disabled={busy}
+            variant="destructive"
+            onClick={() => {
+              onEndRun()
+              setOpen(false)
+            }}
+          >
+            {busy ? "Ending..." : "End Run"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+const JobMarket = memo(function JobMarket({
+  session,
+  busy,
+  onApplyForJob,
+}: {
+  session: GameSession
+  busy: boolean
+  onApplyForJob: (jobId: string) => void
+}) {
+  const marketJobs = session.jobMarketIds ?? []
+  const hasAppliedThisMonth = (session.appliedJobIds ?? []).length > 0
+
+  return (
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold">This month’s openings</p>
+        {hasAppliedThisMonth ? (
+          <Badge variant="secondary">Application used</Badge>
+        ) : (
+          <Badge variant="outline">One application available</Badge>
+        )}
+      </div>
+      {session.lastJobApplication ? (
+        <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+          {session.lastJobApplication.message}
+        </p>
+      ) : null}
+      {marketJobs.length ? (
+        <div className="grid gap-2">
+          {marketJobs.map((job) => {
+            const lockMessage = getJobLockMessage(job, session)
+            const lockTooltip = lockMessage ? getJobLockTooltip(job, session) : null
+            const disabled = busy || hasAppliedThisMonth || Boolean(lockMessage)
+            const button = (
+              <Button
+                disabled={disabled}
+                onClick={() => onApplyForJob(job._id)}
+                variant={lockMessage ? "outline" : "default"}
+              >
+                {lockMessage ? "Locked" : hasAppliedThisMonth ? "Applied" : "Apply"}
+              </Button>
+            )
+
+            return (
+              <div
+                className="grid gap-2 rounded-lg border bg-background px-3 py-3 sm:grid-cols-[1fr_auto] sm:items-center"
+                key={job._id}
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold">{job.title}</p>
+                    <Badge variant={job.requiresDegree ? "secondary" : "outline"}>
+                      Tier {job.tier}
+                    </Badge>
+                    {job.requiresDegree ? <Badge variant="secondary">Degree</Badge> : null}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {money(job.monthlySalary)}/mo · {job.careerTrack} · {job.requiredSkill} {job.requiredSkillLevel}
+                  </p>
+                  {lockMessage ? (
+                    <p className="text-sm text-muted-foreground">{lockMessage}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Estimated offer chance: {Math.round(getEstimatedApplicationChance(job, session) * 100)}%
+                    </p>
+                  )}
+                </div>
+                {lockTooltip ? (
+                  <Tooltip>
+                    <TooltipTrigger render={<span className="inline-flex w-fit" />}>
+                      {button}
+                    </TooltipTrigger>
+                    <TooltipContent>{lockTooltip}</TooltipContent>
+                  </Tooltip>
+                ) : button}
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          No openings are posted this month. Advance to refresh the market.
+        </p>
+      )}
+    </div>
+  )
+})
+
 const JobSelect = memo(function JobSelect({
   jobs,
   value,
@@ -1750,18 +2245,29 @@ const JobSelect = memo(function JobSelect({
 const ExpensePickerGrid = memo(function ExpensePickerGrid({
   optionsByCategory,
   selections,
+  session,
   disabled = false,
   onChange,
 }: {
   optionsByCategory: Record<ExpenseCategory, ExpenseOption[]>
   selections: ExpenseSelections
+  session?: GameSession
   disabled?: boolean
   onChange: (category: MonthlyExpenseCategory, optionId: string) => void
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {monthlyCategories.map((category) => (
-        <div className="grid gap-2" key={category}>
+    <div className="grid gap-3">
+      {monthlyCategories.map((category) => {
+        const selectedOption = optionsByCategory[category].find(
+          (option) => option._id === selections[category],
+        )
+        const lockMessage = session ? getExpenseLockMessage(category, session) : null
+        const statusMessage = selectedOption
+          ? getExpenseStatusMessage(category, selectedOption, session)
+          : null
+
+        return (
+        <div className="grid min-w-0 gap-2" key={category}>
           <Label>{category}</Label>
           <Select
             items={optionsByCategory[category].map((option) => ({
@@ -1774,9 +2280,9 @@ const ExpensePickerGrid = memo(function ExpensePickerGrid({
                 onChange(category, optionId)
               }
             }}
-            disabled={disabled}
+            disabled={disabled || Boolean(lockMessage)}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full min-w-0">
               <SelectValue placeholder={`Select ${category}`} />
             </SelectTrigger>
             <SelectContent>
@@ -1789,8 +2295,16 @@ const ExpensePickerGrid = memo(function ExpensePickerGrid({
               </SelectGroup>
             </SelectContent>
           </Select>
+          {lockMessage ? (
+            <p className="text-xs text-muted-foreground">{lockMessage}</p>
+          ) : statusMessage ? (
+            <p className="text-xs text-muted-foreground">
+              {statusMessage}
+            </p>
+          ) : null}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 })
@@ -1803,22 +2317,15 @@ const HistoryTable = memo(function HistoryTable({ session }: { session: GameSess
   )
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>History</CardTitle>
-        <CardDescription>Life timeline and recent months.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {session.history.length ? (
-          <>
+    <>
+      {session.history.length ? (
+        <div className="grid gap-3">
           <div className="mb-4 flex flex-wrap gap-2">
             {recentEvents.map((round) => (
               <Badge key={`${round.month}-${round.eventTitle}`} variant="secondary">Month {round.month}: {round.eventTitle}</Badge>
             ))}
           </div>
-          <details>
-            <summary className="cursor-pointer text-sm font-medium text-muted-foreground">Show month-by-month history</summary>
-            <div className="mt-4 overflow-x-auto"><Table>
+          <div className="overflow-x-auto"><Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Month</TableHead>
@@ -1847,16 +2354,14 @@ const HistoryTable = memo(function HistoryTable({ session }: { session: GameSess
                 </TableRow>
               ))}
             </TableBody>
-            </Table></div>
-          </details>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No months advanced yet.
-          </p>
-        )}
-      </CardContent>
-    </Card>
+          </Table></div>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          No months advanced yet.
+        </p>
+      )}
+    </>
   )
 })
 
@@ -1980,26 +2485,6 @@ function Field({
   )
 }
 
-const StatCard = memo(function StatCard({
-  label,
-  value,
-  note,
-}: {
-  label: string
-  value: string
-  note?: string
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-2xl">{value}</CardTitle>
-        {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
-      </CardHeader>
-    </Card>
-  )
-})
-
 function getGameTips(session: GameSession, jobs: Job[]) {
   const tips: string[] = []
   const needs = [
@@ -2046,34 +2531,105 @@ function getGameTips(session: GameSession, jobs: Job[]) {
   return tips.length ? tips.slice(0, 4) : ["You are in a stable spot. Keep building skills, saving cash, and protecting your wellbeing."]
 }
 
-const NeedCard = memo(function NeedCard({ label, value }: { label: string; value: number }) {
-  const rounded = Math.round(value)
-  const status = rounded < 25 ? "Critical" : rounded < 50 ? "Strained" : "Stable"
-  const NeedIcon = {
-    Happiness: Heart,
-    Hunger: Utensils,
-    Entertainment: Activity,
-    Love: Heart,
-    Energy: BatteryCharging,
-  }[label] ?? Activity
-  const barColor = rounded < 25 ? "bg-red-500" : rounded < 50 ? "bg-amber-500" : "bg-emerald-600"
+function getJobLockMessage(job: Job, session: GameSession) {
+  const hasGraduated = session.lifePath === "college" && session.educationMonths >= 48
 
+  if (job.requiresDegree && !hasGraduated) {
+    return "Locked until you finish your degree."
+  }
+
+  const skillLevel = session.skills?.[job.requiredSkill] ?? 0
+  if (skillLevel < job.requiredSkillLevel) {
+    return `Needs ${job.requiredSkillLevel} ${job.requiredSkill} skill.`
+  }
+
+  return null
+}
+
+function getJobLockTooltip(job: Job, session: GameSession) {
+  const hasGraduated = session.lifePath === "college" && session.educationMonths >= 48
+
+  if (job.requiresDegree && !hasGraduated) {
+    return "Finish your degree to unlock this career path."
+  }
+
+  return `Set monthly focus to Study to build ${job.requiredSkill} skill and access this job.`
+}
+
+function getEstimatedApplicationChance(job: Job, session: GameSession) {
+  const skillLevel = session.skills?.[job.requiredSkill] ?? 0
+  const skillGap = skillLevel - job.requiredSkillLevel
+  const tierGap = job.tier - session.currentJobId.tier
+  const careerMatchBonus = job.careerTrack === session.currentJobId.careerTrack ? 0.08 : 0
+  const chance = 0.48 + skillGap * 0.06 - Math.max(0, tierGap) * 0.06 + careerMatchBonus
+
+  return Math.max(0.12, Math.min(0.9, Math.round(chance * 100) / 100))
+}
+
+function getAssetValue(session: GameSession) {
   return (
-    <Card className="overflow-hidden">
-      <CardHeader>
-        <CardDescription className="flex items-center gap-2"><NeedIcon className="size-4" />{label}</CardDescription>
-        <CardTitle className="text-2xl">{rounded}</CardTitle>
-        <div className="h-2 overflow-hidden rounded-full bg-muted">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-            style={{ width: `${Math.max(0, Math.min(100, rounded))}%` }}
-          />
-        </div>
-        <p className="text-sm text-muted-foreground">{status}</p>
-      </CardHeader>
-    </Card>
+    (session.stockPortfolio?.value ?? 0) +
+    (session.ownedHome?.estimatedValue ?? 0) +
+    (session.assetHoldings ?? []).reduce(
+      (total, asset) => total + asset.estimatedValue,
+      0,
+    )
   )
-})
+}
+
+function getExpenseLockMessage(category: MonthlyExpenseCategory, session: GameSession) {
+  if (category === "Housing" && (session.housingLeaseMonthsRemaining ?? 0) > 0) {
+    return `Lease locked for ${session.housingLeaseMonthsRemaining} more month${session.housingLeaseMonthsRemaining === 1 ? "" : "s"}.`
+  }
+
+  if (
+    category === "Transportation" &&
+    (session.transportationTermMonthsRemaining ?? 0) > 0 &&
+    !session.vehicleStatus?.broken
+  ) {
+    return `Transportation locked for ${session.transportationTermMonthsRemaining} more month${session.transportationTermMonthsRemaining === 1 ? "" : "s"}.`
+  }
+
+  return null
+}
+
+function getExpenseStatusMessage(
+  category: MonthlyExpenseCategory,
+  option: ExpenseOption,
+  session?: GameSession,
+) {
+  if (category === "Transportation" && session?.vehicleStatus?.broken) {
+    return "Your car is broken. Choose public transit, a used car, or a new lease now."
+  }
+
+  if (category === "Transportation" && session?.vehicleStatus && session.vehicleStatus.type !== "none") {
+    const condition = Math.round(session.vehicleStatus.condition)
+    const mileage = Math.round(session.vehicleStatus.mileage).toLocaleString()
+    const repair = session.vehicleStatus.lastRepairCost
+      ? ` Last repair: ${money(session.vehicleStatus.lastRepairCost)}.`
+      : ""
+
+    return `${getExpenseBenefit(option)} Condition ${condition}%, ${mileage} miles.${repair}`
+  }
+
+  return getExpenseBenefit(option)
+}
+
+function getExpenseBenefit(option: ExpenseOption) {
+  if (option.category === "Housing") {
+    if (option.tier === "Low") return "Cheapest housing, but lowers energy and happiness each month."
+    if (option.tier === "Mid") return "Moderate cost with better rest and a small happiness lift."
+    return "Highest cost, with the strongest happiness, energy, and love benefits."
+  }
+
+  if (option.category === "Transportation") {
+    if (option.tier === "Low") return "Cheapest commute, but drains energy each month."
+    if (option.tier === "Mid") return "Moderate cost that saves a little energy."
+    return "Highest cost, with the best monthly energy benefit."
+  }
+
+  return "lifestyle"
+}
 
 const MonthlyChoiceInput = memo(function MonthlyChoiceInput({
   label,

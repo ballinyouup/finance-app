@@ -220,7 +220,7 @@ describe("catalog and game routes", () => {
       .set("Authorization", authorization);
 
     expect(jobs.status).toBe(200);
-    expect(jobs.body.data.jobs).toHaveLength(5);
+    expect(jobs.body.data.jobs.length).toBeGreaterThan(5);
     expect(expenses.status).toBe(200);
     expect(expenses.body.data.options).toHaveLength(12);
   });
@@ -267,23 +267,233 @@ describe("catalog and game routes", () => {
       .set("Authorization", authorization)
       .send({ lifePath: "college", jobId: barista._id.toString(), expenseSelections });
 
-    const lockedChange = await request(app)
-      .put("/api/game/job")
+    await GameSession.updateOne(
+      { userId: user._id, status: "active" },
+      { jobMarketIds: [developer._id] }
+    );
+
+    const lockedApplication = await request(app)
+      .post("/api/game/job-applications")
       .set("Authorization", authorization)
       .send({ jobId: developer._id.toString() });
-    expect(lockedChange.status).toBe(400);
-    expect(lockedChange.body.error.code).toBe("DEGREE_REQUIRED");
+    expect(lockedApplication.status).toBe(400);
+    expect(lockedApplication.body.error.code).toBe("DEGREE_REQUIRED");
 
     await GameSession.updateOne(
       { userId: user._id, status: "active" },
       { educationMonths: 48, "skills.technical": 6 }
     );
-    const unlockedChange = await request(app)
-      .put("/api/game/job")
+    Math.random.mockReturnValueOnce(0);
+    const unlockedApplication = await request(app)
+      .post("/api/game/job-applications")
       .set("Authorization", authorization)
       .send({ jobId: developer._id.toString() });
-    expect(unlockedChange.status).toBe(200);
-    expect(unlockedChange.body.data.session.currentJobId.title).toBe("Software Developer");
+    expect(unlockedApplication.status).toBe(200);
+    expect(unlockedApplication.body.data.application.accepted).toBe(true);
+    expect(unlockedApplication.body.data.session.currentJobId.title).toBe("Software Developer");
+  });
+
+  it("allows one failed job application per month and refreshes attempts after advancing", async () => {
+    const user = await createUser();
+    const authorization = await authHeader(user);
+    const barista = await Job.findOne({ title: "Barista" });
+    const warehouse = await Job.findOne({ title: "Warehouse Picker" });
+    const delivery = await Job.findOne({ title: "Delivery Driver" });
+    const expenseSelections = await lowExpenseSelections();
+
+    await request(app)
+      .post("/api/game/start")
+      .set("Authorization", authorization)
+      .send({ lifePath: "work", jobId: barista._id.toString(), expenseSelections });
+
+    await GameSession.updateOne(
+      { userId: user._id, status: "active" },
+      { jobMarketIds: [warehouse._id, delivery._id], appliedJobIds: [] }
+    );
+
+    Math.random.mockReturnValueOnce(1);
+    const failedApplication = await request(app)
+      .post("/api/game/job-applications")
+      .set("Authorization", authorization)
+      .send({ jobId: warehouse._id.toString() });
+    expect(failedApplication.status).toBe(200);
+    expect(failedApplication.body.data.application.accepted).toBe(false);
+    expect(failedApplication.body.data.session.appliedJobIds).toHaveLength(1);
+
+    const secondApplication = await request(app)
+      .post("/api/game/job-applications")
+      .set("Authorization", authorization)
+      .send({ jobId: delivery._id.toString() });
+    expect(secondApplication.status).toBe(409);
+    expect(secondApplication.body.error.code).toBe("APPLICATION_USED");
+
+    const advanced = await request(app)
+      .post("/api/game/advance")
+      .set("Authorization", authorization)
+      .send({ months: 1, choices: { foodDays: 20, entertainmentDays: 4, datingDays: 2 } });
+    expect(advanced.status).toBe(200);
+    expect(advanced.body.data.session.appliedJobIds).toHaveLength(0);
+    expect(advanced.body.data.session.jobMarketIds).toHaveLength(6);
+  });
+
+  it("locks housing changes until the annual lease expires", async () => {
+    const user = await createUser();
+    const authorization = await authHeader(user);
+    const job = await Job.findOne({ title: "Barista" });
+    const expenseSelections = await lowExpenseSelections();
+    const studio = await ExpenseOption.findOne({ category: "Housing", tier: "Mid" });
+
+    await request(app)
+      .post("/api/game/start")
+      .set("Authorization", authorization)
+      .send({ lifePath: "work", jobId: job._id.toString(), expenseSelections });
+
+    const lockedChange = await request(app)
+      .put("/api/game/expenses")
+      .set("Authorization", authorization)
+      .send({ category: "Housing", optionId: studio._id.toString() });
+    expect(lockedChange.status).toBe(409);
+    expect(lockedChange.body.error.code).toBe("LEASE_ACTIVE");
+
+    await request(app)
+      .post("/api/game/advance")
+      .set("Authorization", authorization)
+      .send({ months: 12, choices: { foodDays: 20, entertainmentDays: 4, datingDays: 2 } });
+
+    const leaseChange = await request(app)
+      .put("/api/game/expenses")
+      .set("Authorization", authorization)
+      .send({ category: "Housing", optionId: studio._id.toString() });
+    expect(leaseChange.status).toBe(200);
+    expect(leaseChange.body.data.session.currentExpenseSelections.Housing.label).toBe("Studio");
+    expect(leaseChange.body.data.session.housingLeaseMonthsRemaining).toBe(12);
+  });
+
+  it("tracks car wear and allows transportation replacement when the car breaks", async () => {
+    const user = await createUser();
+    const authorization = await authHeader(user);
+    const job = await Job.findOne({ title: "Barista" });
+    const expenseSelections = await lowExpenseSelections();
+    const usedCar = await ExpenseOption.findOne({ category: "Transportation", tier: "Mid" });
+    const newCar = await ExpenseOption.findOne({ category: "Transportation", tier: "High" });
+
+    expenseSelections.Transportation = usedCar._id.toString();
+    await request(app)
+      .post("/api/game/start")
+      .set("Authorization", authorization)
+      .send({ lifePath: "work", jobId: job._id.toString(), expenseSelections });
+
+    const lockedChange = await request(app)
+      .put("/api/game/expenses")
+      .set("Authorization", authorization)
+      .send({ category: "Transportation", optionId: newCar._id.toString() });
+    expect(lockedChange.status).toBe(409);
+    expect(lockedChange.body.error.code).toBe("TRANSPORTATION_TERM_ACTIVE");
+
+    await GameSession.updateOne(
+      { userId: user._id, status: "active" },
+      { vehicleStatus: { type: "used-car", mileage: 110000, condition: 0, broken: true, lastRepairCost: 0 } }
+    );
+
+    const replacement = await request(app)
+      .put("/api/game/expenses")
+      .set("Authorization", authorization)
+      .send({ category: "Transportation", optionId: newCar._id.toString() });
+    expect(replacement.status).toBe(200);
+    expect(replacement.body.data.session.currentExpenseSelections.Transportation.label).toBe("New Car Lease");
+    expect(replacement.body.data.session.vehicleStatus.broken).toBe(false);
+    expect(replacement.body.data.session.transportationTermMonthsRemaining).toBe(12);
+  });
+
+  it("supports debt payoff, stock investing, homes, and asset buy-sell actions", async () => {
+    const user = await createUser();
+    const authorization = await authHeader(user);
+    const job = await Job.findOne({ title: "Barista" });
+    const expenseSelections = await lowExpenseSelections();
+
+    await request(app)
+      .post("/api/game/start")
+      .set("Authorization", authorization)
+      .send({ lifePath: "work", jobId: job._id.toString(), expenseSelections });
+
+    await GameSession.updateOne(
+      { userId: user._id, status: "active" },
+      { balance: 100000, studentDebt: 5000 }
+    );
+
+    const debtPaid = await request(app)
+      .post("/api/game/pay-off-debt")
+      .set("Authorization", authorization);
+    expect(debtPaid.status).toBe(200);
+    expect(debtPaid.body.data.session.studentDebt).toBe(0);
+    expect(debtPaid.body.data.session.balance).toBe(95000);
+
+    const invested = await request(app)
+      .post("/api/game/stocks/invest")
+      .set("Authorization", authorization)
+      .send({ amount: 1000 });
+    expect(invested.status).toBe(200);
+    expect(invested.body.data.session.stockPortfolio.value).toBe(1000);
+
+    const soldStocks = await request(app)
+      .post("/api/game/stocks/sell")
+      .set("Authorization", authorization);
+    expect(soldStocks.status).toBe(200);
+    expect(soldStocks.body.data.session.stockPortfolio.value).toBe(0);
+
+    const boughtHome = await request(app)
+      .post("/api/game/home/buy")
+      .set("Authorization", authorization)
+      .send({ homeId: "starter-condo" });
+    expect(boughtHome.status).toBe(200);
+    expect(boughtHome.body.data.session.ownedHome.label).toBe("Starter Condo");
+
+    const soldHome = await request(app)
+      .post("/api/game/home/sell")
+      .set("Authorization", authorization);
+    expect(soldHome.status).toBe(200);
+    expect(soldHome.body.data.session.homeOwned).toBe(false);
+
+    const boughtAsset = await request(app)
+      .post("/api/game/assets/buy")
+      .set("Authorization", authorization)
+      .send({ assetId: "savings-bond" });
+    expect(boughtAsset.status).toBe(200);
+    expect(boughtAsset.body.data.session.assetHoldings).toHaveLength(1);
+
+    const holdingId = boughtAsset.body.data.session.assetHoldings[0]._id;
+    const soldAsset = await request(app)
+      .post("/api/game/assets/sell")
+      .set("Authorization", authorization)
+      .send({ holdingId });
+    expect(soldAsset.status).toBe(200);
+    expect(soldAsset.body.data.session.assetHoldings).toHaveLength(0);
+  });
+
+  it("lets a player manually end an active run and receive a recap", async () => {
+    const user = await createUser();
+    const authorization = await authHeader(user);
+    const job = await Job.findOne({ title: "Barista" });
+    const expenseSelections = await lowExpenseSelections();
+
+    await request(app)
+      .post("/api/game/start")
+      .set("Authorization", authorization)
+      .send({ lifePath: "work", jobId: job._id.toString(), expenseSelections });
+
+    const ended = await request(app)
+      .post("/api/game/end-run")
+      .set("Authorization", authorization);
+
+    expect(ended.status).toBe(200);
+    expect(ended.body.data.session.status).toBe("dead");
+    expect(ended.body.data.session.deathReason).toBe("You ended this run and started over.");
+    expect(ended.body.data.session.deathRecap.eventTitle).toBe("Run ended by player");
+
+    const current = await request(app)
+      .get("/api/game/current")
+      .set("Authorization", authorization);
+    expect(current.body.data.session).toBeNull();
   });
 
   it("advances one month or one year and keeps the run active when death is not rolled", async () => {
@@ -342,6 +552,9 @@ describe("catalog and game routes", () => {
     expect(advanced.status).toBe(200);
     expect(session.status).toBe("dead");
     expect(session.finalScore).toEqual(expect.any(Number));
+    expect(session.deathRecap.reason).toEqual(expect.any(String));
+    expect(session.deathRecap.chance).toBeGreaterThan(0);
+    expect(session.deathRecap.roll).toBe(0);
   });
 });
 

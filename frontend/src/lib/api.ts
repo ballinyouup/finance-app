@@ -73,6 +73,30 @@ export type MonthlyChoices = {
   debtPayment: number
 }
 
+export type StockPortfolio = {
+  invested: number
+  value: number
+}
+
+export type OwnedHome = {
+  homeId: string
+  label: string
+  purchasePrice: number
+  estimatedValue: number
+  monthlyUpkeep: number
+  purchasedMonth: number
+}
+
+export type AssetHolding = {
+  _id: string
+  assetId: string
+  label: string
+  category: string
+  purchasePrice: number
+  estimatedValue: number
+  purchasedMonth: number
+}
+
 export type RoundHistory = {
   month: number
   ageMonths: number
@@ -108,9 +132,45 @@ export type GameSession = {
   needs: NeedScores
   monthlyChoices: MonthlyChoices
   currentJobId: Job
+  jobMarketIds: Job[]
+  appliedJobIds: string[]
+  lastJobApplication?: {
+    month: number
+    jobId: string
+    jobTitle: string
+    accepted: boolean
+    chance: number
+    message: string
+  }
   currentExpenseSelections: PopulatedExpenseSelections
+  housingLeaseMonthsRemaining: number
+  transportationTermMonthsRemaining: number
+  vehicleStatus?: {
+    type: "none" | "used-car" | "new-car"
+    mileage: number
+    condition: number
+    broken: boolean
+    lastRepairCost: number
+  }
+  stockPortfolio?: StockPortfolio
+  ownedHome?: OwnedHome
+  assetHoldings: AssetHolding[]
   history: RoundHistory[]
   finalScore?: number
+  deathReason?: string
+  deathRecap?: {
+    reason?: string
+    roll?: number
+    chance?: number
+    ageMonths?: number
+    balance?: number
+    studentDebt?: number
+    assetValue?: number
+    finalScore?: number
+    jobTitle?: string
+    eventTitle?: string
+    needs?: NeedScores
+  }
   completedAt?: string
 }
 
@@ -287,9 +347,12 @@ export const api = {
       token,
       body: JSON.stringify(payload),
     }),
-  changeJob: (token: string, jobId: string) =>
-    apiRequest<{ session: GameSession }>("/game/job", {
-      method: "PUT",
+  applyForJob: (token: string, jobId: string) =>
+    apiRequest<{
+      session: GameSession
+      application: NonNullable<GameSession["lastJobApplication"]>
+    }>("/game/job-applications", {
+      method: "POST",
       token,
       body: JSON.stringify({ jobId }),
     }),
@@ -314,8 +377,45 @@ export const api = {
       token,
       body: JSON.stringify({ months, choices }),
     }),
+  endRun: (token: string) =>
+    apiRequest<{ session: GameSession }>("/game/end-run", { method: "POST", token }),
   buyHome: (token: string) =>
     apiRequest<{ session: GameSession }>("/game/buy-home", { method: "POST", token }),
+  payOffDebt: (token: string) =>
+    apiRequest<{ session: GameSession }>("/game/pay-off-debt", { method: "POST", token }),
+  investStocks: (token: string, amount: number) =>
+    apiRequest<{ session: GameSession }>("/game/stocks/invest", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ amount }),
+    }),
+  sellStocks: (token: string) =>
+    apiRequest<{ session: GameSession }>("/game/stocks/sell", { method: "POST", token }),
+  buyHomeType: (token: string, homeId: string) =>
+    apiRequest<{ session: GameSession }>("/game/home/buy", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ homeId }),
+    }),
+  sellHome: (token: string) =>
+    apiRequest<{ session: GameSession }>("/game/home/sell", { method: "POST", token }),
+  buyAsset: (token: string, assetId: string) =>
+    apiRequest<{ session: GameSession }>("/game/assets/buy", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ assetId }),
+    }),
+  sellAsset: (token: string, holdingId: string) =>
+    apiRequest<{ session: GameSession }>("/game/assets/sell", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ holdingId }),
+    }),
+  sellCar: (token: string) =>
+    apiRequest<{ session: GameSession; resaleValue: number }>("/game/transportation/sell", {
+      method: "POST",
+      token,
+    }),
   leaderboard: (limit = 20) =>
     apiRequest<{ entries: LeaderboardEntry[] }>(`/leaderboard?limit=${limit}`),
 }

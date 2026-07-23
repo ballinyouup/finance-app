@@ -57,6 +57,70 @@ const expenseSelectionsSchema = Object.fromEntries(
   ])
 );
 
+const jobApplicationResultSchema = new mongoose.Schema(
+  {
+    month: { type: Number, required: true },
+    jobId: { type: mongoose.Schema.Types.ObjectId, ref: "Job", required: true },
+    jobTitle: { type: String, required: true },
+    accepted: { type: Boolean, required: true },
+    chance: { type: Number, required: true },
+    message: { type: String, required: true }
+  },
+  { _id: false }
+);
+
+const vehicleStatusSchema = {
+  type: { type: String, enum: ["none", "used-car", "new-car"], default: "none" },
+  mileage: { type: Number, default: 0, min: 0 },
+  condition: { type: Number, default: 100, min: 0, max: 100 },
+  broken: { type: Boolean, default: false },
+  lastRepairCost: { type: Number, default: 0, min: 0 }
+};
+
+const stockPortfolioSchema = {
+  invested: { type: Number, default: 0, min: 0 },
+  value: { type: Number, default: 0, min: 0 }
+};
+
+const ownedHomeSchema = {
+  homeId: { type: String },
+  label: { type: String },
+  purchasePrice: { type: Number, default: 0, min: 0 },
+  estimatedValue: { type: Number, default: 0, min: 0 },
+  monthlyUpkeep: { type: Number, default: 0, min: 0 },
+  drift: { type: Number, default: 0 },
+  volatility: { type: Number, default: 0 },
+  purchasedMonth: { type: Number, default: 1, min: 1 }
+};
+
+const assetHoldingSchema = new mongoose.Schema(
+  {
+    assetId: { type: String, required: true },
+    label: { type: String, required: true },
+    category: { type: String, required: true },
+    purchasePrice: { type: Number, required: true, min: 0 },
+    estimatedValue: { type: Number, required: true, min: 0 },
+    drift: { type: Number, default: 0 },
+    volatility: { type: Number, default: 0 },
+    purchasedMonth: { type: Number, default: 1, min: 1 }
+  },
+  { timestamps: false }
+);
+
+const deathRecapSchema = {
+  reason: { type: String },
+  roll: { type: Number },
+  chance: { type: Number },
+  ageMonths: { type: Number },
+  balance: { type: Number },
+  studentDebt: { type: Number },
+  assetValue: { type: Number },
+  finalScore: { type: Number },
+  jobTitle: { type: String },
+  eventTitle: { type: String },
+  needs: needsSchema
+};
+
 const gameSessionSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
@@ -77,10 +141,20 @@ const gameSessionSchema = new mongoose.Schema(
     needs: needsSchema,
     monthlyChoices: monthlyChoicesSchema,
     currentJobId: { type: mongoose.Schema.Types.ObjectId, ref: "Job", required: true },
+    jobMarketIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Job" }], default: [] },
+    appliedJobIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Job" }], default: [] },
+    lastJobApplication: { type: jobApplicationResultSchema },
     currentExpenseSelections: expenseSelectionsSchema,
+    housingLeaseMonthsRemaining: { type: Number, default: 12, min: 0 },
+    transportationTermMonthsRemaining: { type: Number, default: 12, min: 0 },
+    vehicleStatus: { type: vehicleStatusSchema, default: () => ({}) },
+    stockPortfolio: { type: stockPortfolioSchema, default: () => ({}) },
+    ownedHome: { type: ownedHomeSchema },
+    assetHoldings: { type: [assetHoldingSchema], default: [] },
     history: { type: [historySchema], default: [] },
     finalScore: { type: Number },
     deathReason: { type: String },
+    deathRecap: deathRecapSchema,
     startedAt: { type: Date, default: Date.now },
     completedAt: { type: Date }
   },
