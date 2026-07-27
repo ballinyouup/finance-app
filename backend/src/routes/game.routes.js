@@ -75,6 +75,7 @@ const advanceSchema = z.object({
 });
 
 const JOB_MARKET_SIZE = 6;
+const STARTER_JOB_MAX_TIER = 1;
 
 async function populateSession(query) {
   return query
@@ -143,6 +144,24 @@ function assertJobAvailable(job, session) {
 
   if (lockReason) {
     throw new ApiError(400, lockReason.code, lockReason.message);
+  }
+}
+
+function assertStarterJobAvailable(job) {
+  if (job.requiresDegree) {
+    throw new ApiError(
+      400,
+      "DEGREE_REQUIRED",
+      `${job.title} requires a degree and unlocks after graduating from college.`
+    );
+  }
+
+  if ((job.tier ?? 1) > STARTER_JOB_MAX_TIER) {
+    throw new ApiError(
+      400,
+      "STARTER_JOB_REQUIRED",
+      "Choose an entry-level job to start. Higher-paying roles unlock through job applications."
+    );
   }
 }
 
@@ -303,7 +322,7 @@ gameRouter.post("/start", validate(startSchema), async (req, res, next) => {
     }
 
     const job = await assertJobExists(req.body.jobId);
-    assertJobAvailable(job, { lifePath: req.body.lifePath, educationMonths: 0, skills: {} });
+    assertStarterJobAvailable(job);
     await getExpenseOptionsBySelection(req.body.expenseSelections);
 
     const session = await GameSession.create({

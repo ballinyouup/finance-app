@@ -1167,8 +1167,8 @@ function StartRunPanel({
   const majorLabelId = useId()
   const jobLabelId = useId()
   const availableJobs = useMemo(
-    () => jobs.filter((job) => lifePath !== "college" || !job.requiresDegree),
-    [jobs, lifePath],
+    () => jobs.filter((job) => !job.requiresDegree && job.tier <= 1),
+    [jobs],
   )
 
   useEffect(() => {
@@ -1253,7 +1253,7 @@ function StartRunPanel({
           />
           {lifePath === "college" ? (
             <p className="text-sm text-muted-foreground">
-              Degree-required careers unlock after you graduate in 48 months.
+              Higher-paying careers unlock through monthly job applications.
             </p>
           ) : null}
         </div>

@@ -248,6 +248,21 @@ describe("catalog and game routes", () => {
     expect(duplicate.body.error.code).toBe("ACTIVE_SESSION_EXISTS");
   });
 
+  it("only allows entry-level jobs when starting a run", async () => {
+    const user = await createUser();
+    const authorization = await authHeader(user);
+    const officeAdmin = await Job.findOne({ title: "Office Admin" });
+    const expenseSelections = await lowExpenseSelections();
+
+    const response = await request(app)
+      .post("/api/game/start")
+      .set("Authorization", authorization)
+      .send({ lifePath: "work", jobId: officeAdmin._id.toString(), expenseSelections });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("STARTER_JOB_REQUIRED");
+  });
+
   it("keeps degree-required jobs locked until a college player graduates", async () => {
     const user = await createUser();
     const authorization = await authHeader(user);
