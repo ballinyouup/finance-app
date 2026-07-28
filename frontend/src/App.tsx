@@ -22,12 +22,15 @@ import {
   ArrowRight,
   Banknote,
   BriefcaseBusiness,
+  CalendarDays,
   ChartNoAxesColumnIncreasing,
   CircleDollarSign,
   LogOut,
   Medal,
   Play,
   RefreshCw,
+  Search,
+  ShieldAlert,
   Trophy,
   HeartPulse,
   Wrench,
@@ -307,98 +310,201 @@ function Shell({
 
 function HomePage({ user }: { user: User | null }) {
   return (
-    <div className="grid gap-8">
+    <div className="grid gap-10">
       <section
-        className="relative grid min-h-[min(620px,calc(100svh-7rem))] overflow-hidden rounded-xl bg-cover bg-center px-5 py-8 text-white sm:px-8 md:items-end"
-        style={{ backgroundImage: `linear-gradient(90deg, rgba(8, 47, 73, 0.88), rgba(8, 47, 73, 0.42)), url(${heroImage})` }}
+        className="relative grid min-h-[min(690px,calc(100svh-6rem))] overflow-hidden rounded-xl bg-cover bg-center text-white"
+        style={{
+          backgroundImage: `linear-gradient(90deg, rgba(5, 31, 45, 0.94), rgba(10, 86, 94, 0.70), rgba(15, 23, 42, 0.38)), url(${heroImage})`,
+        }}
       >
-        <div className="grid max-w-3xl gap-5">
-          <Badge className="w-fit bg-white/95 text-emerald-800 hover:bg-white/95">
-            Life strategy finance game
-          </Badge>
-          <h1 className="max-w-3xl text-4xl font-semibold tracking-normal sm:text-5xl">
-            MoneySim
-          </h1>
-          <p className="max-w-2xl text-base leading-7 text-white/90">
-            Start at 18, choose work or college, plan each month, react to events,
-            maintain your health, and build a score from cash, assets, career
-            progress, goals, and wellbeing.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              className={buttonVariants({ size: "lg" })}
-              to={user ? "/dashboard" : "/login"}
-            >
-              Play Now
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
-            <Link
-              className={buttonVariants({ size: "lg", variant: "outline" })}
-              to="/leaderboard"
-            >
-              View Leaderboard
-            </Link>
+        <div className="grid gap-6 px-5 py-7 sm:px-8 lg:grid-cols-[1fr_25rem] lg:items-end lg:px-10 lg:py-10">
+          <div className="grid max-w-3xl content-end gap-5 self-end">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="w-fit bg-white text-emerald-900 hover:bg-white">
+                Life strategy finance game
+              </Badge>
+              <Badge className="w-fit border-white/40 bg-black/25 text-white hover:bg-black/25">
+                Every turn is one month
+              </Badge>
+            </div>
+            <div className="grid gap-3">
+              <h1 className="max-w-3xl text-4xl font-semibold tracking-normal sm:text-6xl">
+                MoneySim
+              </h1>
+              <p className="max-w-2xl text-base leading-7 text-white/90 sm:text-lg">
+                Pick a path at 18, manage the next month, and watch a life unfold
+                through jobs, debt, cars, health conditions, assets, and sudden
+                events.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                className={buttonVariants({
+                  size: "lg",
+                  className: "bg-emerald-500 text-slate-950 hover:bg-emerald-400",
+                })}
+                to={user ? "/dashboard" : "/login"}
+              >
+                Play Now
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Link>
+              <Link
+                className={buttonVariants({
+                  size: "lg",
+                  variant: "outline",
+                  className: "border-white/80 bg-white text-slate-950 hover:bg-white/90 hover:text-slate-950",
+                })}
+                to="/leaderboard"
+              >
+                View Leaderboard
+              </Link>
+            </div>
+            <div className="grid max-w-2xl gap-2 sm:grid-cols-3">
+              <HeroStat label="Current income" value="$2,932/mo" />
+              <HeroStat label="Health risk" value="0.18%" />
+              <HeroStat label="Net worth" value="$14,800" />
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-xl border border-white/20 bg-slate-950/60 p-4 shadow-2xl backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase text-emerald-200">
+                  Month 27
+                </p>
+                <p className="text-xl font-semibold">Plan the turn</p>
+              </div>
+              <Badge className="bg-amber-300 text-slate-950 hover:bg-amber-300">
+                Car repair pending
+              </Badge>
+            </div>
+            <div className="grid gap-2">
+              {[
+                ["Focus", "Study", "Build business skill"],
+                ["Food", "24 days", "$312 planned"],
+                ["Loan payment", "$400", "Debt down to $18,900"],
+              ].map(([label, value, note]) => (
+                <div className="grid gap-1 rounded-lg border border-white/15 bg-white/10 px-3 py-2" key={label}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-white/75">{label}</p>
+                    <p className="font-semibold">{value}</p>
+                  </div>
+                  <p className="text-xs text-white/60">{note}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <MiniNeed label="Energy" value="58" tone="bg-emerald-400" />
+              <MiniNeed label="Hunger" value="72" tone="bg-cyan-300" />
+              <MiniNeed label="Happy" value="43" tone="bg-amber-300" />
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3" aria-labelledby="how-to-play-heading">
-        <div className="md:col-span-3">
-          <h2 id="how-to-play-heading" className="text-2xl font-semibold tracking-normal">
-            How To Play
-          </h2>
-        </div>
-        <FeatureCard
+      <section className="grid gap-4 rounded-xl border bg-background p-4 shadow-sm md:grid-cols-4">
+        <LandingStep
           icon={<Play className="size-5" aria-hidden="true" />}
-          title="Start A Run"
-          text="Pick full-time work or college, choose a starter job, and lock in housing and transportation."
+          step="1"
+          title="Start"
+          text="Choose work or college, then pick a tier 1 starter job."
         />
-        <FeatureCard
-          icon={<Banknote className="size-5" aria-hidden="true" />}
-          title="Plan Each Month"
-          text="Set food, fun, dating, loan payments, and a monthly focus before advancing time."
+        <LandingStep
+          icon={<CalendarDays className="size-5" aria-hidden="true" />}
+          step="2"
+          title="Plan"
+          text="Set focus, food, fun, dating, internship, and debt payment."
         />
-        <FeatureCard
-          icon={<HeartPulse className="size-5" aria-hidden="true" />}
-          title="Protect Health"
-          text="Low needs create medical conditions instead of instant death, so recover while managing treatment costs."
+        <LandingStep
+          icon={<ShieldAlert className="size-5" aria-hidden="true" />}
+          step="3"
+          title="React"
+          text="Handle bills, breakdowns, health conditions, and market swings."
         />
-        <FeatureCard
-          icon={<BriefcaseBusiness className="size-5" aria-hidden="true" />}
-          title="Build A Career"
-          text="Study, intern, apply to job openings, and graduate to unlock higher-paying roles."
-        />
-        <FeatureCard
-          icon={<Wrench className="size-5" aria-hidden="true" />}
-          title="Handle Events"
-          text="Popups call out breakdowns, bills, promotions, market swings, and other changes after a turn."
-        />
-        <FeatureCard
+        <LandingStep
           icon={<Trophy className="size-5" aria-hidden="true" />}
-          title="Submit Score"
-          text="End the run when ready. Final score rewards net worth, goals, age, needs, and fewer conditions."
+          step="4"
+          title="Score"
+          text="End the run when ready and compare the recap on the leaderboard."
         />
       </section>
 
-      <section className="grid gap-4 md:grid-cols-[0.9fr_1.1fr] md:items-start">
-        <div className="grid gap-2">
-          <h2 className="text-2xl font-semibold tracking-normal">What Matters</h2>
+      <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+        <div className="grid gap-3">
+          <Badge className="w-fit" variant="secondary">Decision pressure</Badge>
+          <h2 className="text-3xl font-semibold tracking-normal">
+            The best move changes month by month.
+          </h2>
           <p className="text-muted-foreground">
-            MoneySim is not a one-year budget calculator anymore. It is an open-ended
-            life sim where short-term savings, long-term assets, health, transportation,
-            education, and career choices all push against each other.
+            Study unlocks better jobs. Rest protects energy. Cheap transportation
+            saves cash until a repair blocks the next turn. The game is about
+            surviving those tradeoffs without losing the long-term score.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
+          <LandingSystem
+            icon={<BriefcaseBusiness className="size-5" aria-hidden="true" />}
+            title="Career ladder"
+            value="Tier 1 -> Tier 5"
+            text="Higher-paying openings appear as your skills, degree, and performance improve."
+          />
+          <LandingSystem
+            icon={<HeartPulse className="size-5" aria-hidden="true" />}
+            title="Health pressure"
+            value="Conditions, not instant death"
+            text="Low needs add medical costs and penalties while the run continues."
+          />
+          <LandingSystem
+            icon={<Wrench className="size-5" aria-hidden="true" />}
+            title="Transportation"
+            value="Broken means blocked"
+            text="Repair, sell, or switch transportation before the next advance."
+          />
+          <LandingSystem
+            icon={<Banknote className="size-5" aria-hidden="true" />}
+            title="Assets and debt"
+            value="Cash is not enough"
+            text="Stocks, homes, collectibles, and student debt shape the final score."
+          />
+        </div>
+      </section>
+
+      <section className="grid gap-4 rounded-xl bg-slate-950 p-4 text-white md:grid-cols-[1fr_1fr] md:p-5">
+        <div className="grid content-between gap-6 rounded-lg border border-white/15 bg-white/10 p-4">
+          <div className="grid gap-2">
+            <Badge className="w-fit bg-cyan-200 text-slate-950 hover:bg-cyan-200">
+              Leaderboard recaps
+            </Badge>
+            <h2 className="text-3xl font-semibold tracking-normal">
+              Search a player. Inspect the run.
+            </h2>
+            <p className="text-white/75">
+              Finished runs expose the recap: job path, score, health conditions,
+              recent events, and the choices that pushed the ending.
+            </p>
+          </div>
+          <Link
+            className={buttonVariants({
+              className: "w-fit bg-cyan-200 text-slate-950 hover:bg-cyan-100",
+            })}
+            to="/leaderboard"
+          >
+            <Search className="size-4" aria-hidden="true" />
+            Search Recaps
+          </Link>
+        </div>
+        <div className="grid gap-3">
           {[
-            ["Monthly choices", "Food, fun, dating, focus activity, internship, and debt payment shape the next turn."],
-            ["Commitments", "Housing and transportation terms lock for months, and broken cars must be resolved."],
-            ["Assets", "Stocks, homes, and collectibles can gain or lose value as the run continues."],
-            ["Leaderboard", "Manual run endings publish a final score for comparison."],
-          ].map(([title, text]) => (
-            <div className="rounded-lg border bg-background p-3" key={title}>
-              <p className="font-semibold">{title}</p>
-              <p className="text-sm text-muted-foreground">{text}</p>
+            ["Specific Runner", "$48,100", "Graduated, bought a home, two promotions"],
+            ["High Score", "$31,450", "Avoided debt, sold stocks before a drop"],
+            ["Low Score", "-$2,900", "Broken car, nutrition deficiency, high debt"],
+          ].map(([name, score, note], index) => (
+            <div className="grid gap-1 rounded-lg border border-white/15 bg-white/10 p-3" key={name}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold">{index + 1}. {name}</p>
+                <p className="text-cyan-200">{score}</p>
+              </div>
+              <p className="text-sm text-white/65">{note}</p>
             </div>
           ))}
         </div>
@@ -407,25 +513,86 @@ function HomePage({ user }: { user: User | null }) {
   )
 }
 
-function FeatureCard({
+function HeroStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/20 bg-black/25 px-3 py-2 backdrop-blur">
+      <p className="text-xs text-white/65">{label}</p>
+      <p className="font-semibold">{value}</p>
+    </div>
+  )
+}
+
+function MiniNeed({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone: string
+}) {
+  return (
+    <div className="grid gap-1 rounded-lg bg-white/10 px-2 py-2">
+      <p className="text-xs text-white/65">{label}</p>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
+        <div className={`h-full ${tone}`} style={{ width: `${value}%` }} />
+      </div>
+      <p className="text-sm font-semibold">{value}</p>
+    </div>
+  )
+}
+
+function LandingStep({
   icon,
+  step,
   title,
   text,
 }: {
   icon: ReactNode
+  step: string
   title: string
   text: string
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <div className="mb-2 flex size-9 items-center justify-center rounded-lg bg-cyan-700 text-white">
+    <div className="grid gap-3 rounded-lg border bg-card p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-700 text-white">
           {icon}
         </div>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{text}</CardDescription>
-      </CardHeader>
-    </Card>
+        <span className="text-sm font-semibold text-muted-foreground">{step}</span>
+      </div>
+      <div className="grid gap-1">
+        <h2 className="text-base font-semibold tracking-normal">{title}</h2>
+        <p className="text-sm text-muted-foreground">{text}</p>
+      </div>
+    </div>
+  )
+}
+
+function LandingSystem({
+  icon,
+  title,
+  value,
+  text,
+}: {
+  icon: ReactNode
+  title: string
+  value: string
+  text: string
+}) {
+  return (
+    <div className="grid gap-3 rounded-lg border bg-background p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex size-9 items-center justify-center rounded-lg bg-slate-900 text-white">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold">{title}</p>
+          <p className="truncate text-sm text-emerald-700">{value}</p>
+        </div>
+      </div>
+      <p className="text-sm text-muted-foreground">{text}</p>
+    </div>
   )
 }
 
