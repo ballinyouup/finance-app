@@ -341,7 +341,8 @@ function HomePage({ user }: { user: User | null }) {
               <Link
                 className={buttonVariants({
                   size: "lg",
-                  className: "bg-emerald-300 text-slate-950 hover:bg-emerald-200 hover:text-slate-950 [&_svg]:text-slate-950",
+                  variant: "outline",
+                  className: "text-slate-950 ",
                 })}
                 to={user ? "/dashboard" : "/login"}
               >
@@ -484,13 +485,15 @@ function HomePage({ user }: { user: User | null }) {
             </p>
           </div>
           <Link
-            className={buttonVariants({
-              className: "w-fit bg-cyan-200 text-slate-950 hover:bg-cyan-100",
-            })}
-            to="/leaderboard"
+              className={buttonVariants({
+                size: "lg",
+                variant: "outline",
+                className: "text-slate-950 ",
+              })}
+              to="/leaderboard"
           >
-            <Search className="size-4" aria-hidden="true" />
             Search Recaps
+            <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
         </div>
         <div className="grid gap-3">
