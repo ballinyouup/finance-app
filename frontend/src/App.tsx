@@ -341,7 +341,7 @@ function HomePage({ user }: { user: User | null }) {
               <Link
                 className={buttonVariants({
                   size: "lg",
-                  className: "bg-emerald-500 text-slate-950 hover:bg-emerald-400",
+                  className: "bg-emerald-300 text-slate-950 hover:bg-emerald-200 hover:text-slate-950 [&_svg]:text-slate-950",
                 })}
                 to={user ? "/dashboard" : "/login"}
               >
@@ -350,12 +350,12 @@ function HomePage({ user }: { user: User | null }) {
               </Link>
               <Link
                 className={buttonVariants({
-                  size: "lg",
-                  variant: "outline",
-                  className: "border-white/80 bg-white text-slate-950 hover:bg-white/90 hover:text-slate-950",
-                })}
-                to="/leaderboard"
-              >
+                size: "lg",
+                variant: "outline",
+                className: "border-white bg-slate-950 text-white hover:bg-slate-900 hover:text-white [&_svg]:text-white",
+              })}
+              to="/leaderboard"
+            >
                 View Leaderboard
               </Link>
             </div>
