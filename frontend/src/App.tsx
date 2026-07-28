@@ -493,7 +493,7 @@ function HomePage({ user }: { user: User | null }) {
               to="/leaderboard"
           >
             Search Recaps
-            <ArrowRight className="size-4" aria-hidden="true" />
+            <Search className="size-4" aria-hidden="true" />
           </Link>
         </div>
         <div className="grid gap-3">
