@@ -21,12 +21,16 @@ import {
 import {
   ArrowRight,
   Banknote,
+  Bed,
+  BookOpen,
   BriefcaseBusiness,
   CalendarDays,
   ChartNoAxesColumnIncreasing,
   CircleDollarSign,
+  Dumbbell,
   LogOut,
   Medal,
+  PartyPopper,
   Play,
   RefreshCw,
   Search,
@@ -1288,7 +1292,7 @@ function DashboardPage({ token }: { token: string }) {
         <div>
           <h1 className="text-3xl font-semibold tracking-normal">Dashboard</h1>
           <p className="text-muted-foreground">
-            Adjust your job and monthly costs before advancing each month.
+            Adjust life choices, expenses, jobs, assets, and debt.
           </p>
         </div>
         <Badge variant={session ? "default" : "secondary"}>
@@ -1855,15 +1859,13 @@ const MonthlyPlanPanel = memo(function MonthlyPlanPanel({
   const focusLabelId = useId()
 
   return (
-    <Card className="border-primary/40 bg-gradient-to-br from-card to-emerald-50/70 shadow-sm">
+    <Card className="border-primary/20 bg-background shadow-sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2" role="heading" aria-level={2}>
           <RefreshCw className="size-5" aria-hidden="true" />
           Monthly Plan
         </CardTitle>
-        <CardDescription>
-          Set this month’s choices, then advance when ready.
-        </CardDescription>
+        <CardDescription>Set this month, then advance when ready.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid gap-2 sm:grid-cols-4">
@@ -1873,31 +1875,15 @@ const MonthlyPlanPanel = memo(function MonthlyPlanPanel({
           <ForecastItem label="After" value={money(session.balance + projectedChange)} tone="text-foreground" />
         </div>
         <div className="grid gap-3 lg:grid-cols-[1fr_1.1fr]">
-          <div className="grid gap-2">
-            <Label id={focusLabelId}>Focus</Label>
-            <div
-              aria-labelledby={focusLabelId}
-              className="grid grid-cols-2 gap-2"
-              role="group"
-            >
-              {([
-                ["study", "Study"],
-                ["exercise", "Exercise"],
-                ["recreation", "Recreation"],
-                ["rest", "Rest"],
-              ] as const).map(([activity, label]) => (
-                <Button
-                  key={activity}
-                  type="button"
-                  variant={choices.activity === activity ? "default" : "outline"}
-                  aria-pressed={choices.activity === activity}
-                  disabled={busy}
-                  onClick={() => setChoices((current) => ({ ...current, activity }))}
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
+          <div className="grid gap-3">
+            <FocusChoiceGrid
+              disabled={busy}
+              labelId={focusLabelId}
+              value={choices.activity}
+              onChange={(activity) =>
+                setChoices((current) => ({ ...current, activity }))
+              }
+            />
             {session.lifePath === "college" && session.educationMonths < 48 ? (
               <Button
                 type="button"
@@ -1974,6 +1960,82 @@ const MonthlyPlanPanel = memo(function MonthlyPlanPanel({
   )
 })
 
+function FocusChoiceGrid({
+  value,
+  labelId,
+  disabled,
+  onChange,
+}: {
+  value: MonthlyChoices["activity"]
+  labelId: string
+  disabled: boolean
+  onChange: (activity: MonthlyChoices["activity"]) => void
+}) {
+  const options: Array<{
+    value: MonthlyChoices["activity"]
+    label: string
+    description: string
+    icon: ReactNode
+  }> = [
+    {
+      value: "study",
+      label: "Study",
+      description: "Build skills",
+      icon: <BookOpen className="size-4" aria-hidden="true" />,
+    },
+    {
+      value: "rest",
+      label: "Rest",
+      description: "Recover energy",
+      icon: <Bed className="size-4" aria-hidden="true" />,
+    },
+    {
+      value: "exercise",
+      label: "Exercise",
+      description: "Energy tradeoff",
+      icon: <Dumbbell className="size-4" aria-hidden="true" />,
+    },
+    {
+      value: "recreation",
+      label: "Fun",
+      description: "Lift happiness",
+      icon: <PartyPopper className="size-4" aria-hidden="true" />,
+    },
+  ]
+
+  return (
+    <div className="grid gap-2">
+      <Label id={labelId}>Focus</Label>
+      <div aria-labelledby={labelId} className="grid grid-cols-2 gap-2" role="group">
+        {options.map((option) => (
+          <button
+            aria-pressed={value === option.value}
+            className={`grid min-h-16 grid-cols-[auto_1fr] items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 ${
+              value === option.value
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background hover:bg-muted"
+            }`}
+            disabled={disabled}
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            type="button"
+          >
+            <span className="flex size-8 items-center justify-center rounded-md bg-current/10">
+              {option.icon}
+            </span>
+            <span className="grid min-w-0 gap-0.5">
+              <span className="truncate font-semibold">{option.label}</span>
+              <span className={`truncate text-xs ${value === option.value ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                {option.description}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function CompactMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border bg-background px-3 py-2">
@@ -2043,7 +2105,7 @@ const MedicalConditionsPanel = memo(function MedicalConditionsPanel({ session }:
           Medical Conditions
         </CardTitle>
         <CardDescription>
-          Conditions add monthly costs and need pressure, but the run continues.
+          Conditions add monthly costs and need pressure.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-2">
