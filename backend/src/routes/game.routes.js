@@ -209,7 +209,23 @@ function scoreJobForMarket(job, session) {
 
 async function refreshJobMarket(session) {
   const currentJobId = session.currentJobId?._id ?? session.currentJobId;
-  const jobs = await Job.find({ _id: { $ne: currentJobId } }).sort({ tier: 1, title: 1 });
+  const currentJob = session.currentJobId?.monthlySalary
+    ? session.currentJobId
+    : await Job.findById(currentJobId);
+  const currentSalary = currentJob?.monthlySalary ?? 0;
+  const hasGraduated = session.lifePath === "college" && session.educationMonths >= 48;
+  const isBetweenJobs = (session.unemployedMonths ?? 0) > 0;
+  const query = { _id: { $ne: currentJobId } };
+
+  if (!hasGraduated) {
+    query.requiresDegree = { $ne: true };
+  }
+
+  if (!isBetweenJobs && currentSalary > 0) {
+    query.monthlySalary = { $gt: currentSalary };
+  }
+
+  const jobs = await Job.find(query).sort({ tier: 1, monthlySalary: 1, title: 1 });
   const sortedJobs = jobs
     .map((job) => ({ job, score: scoreJobForMarket(job, session) }))
     .sort((a, b) => a.score - b.score)
@@ -257,6 +273,11 @@ function createVehicleStatus(option) {
   return { type: "new-car", mileage: 5000, condition: 96, broken: false, lastRepairCost: 0 };
 }
 
+function calculateVehicleRepairCost(status) {
+  const baseCost = status.type === "new-car" ? 450 : 650;
+  return Math.round(baseCost + (100 - Math.max(0, status.condition ?? 0)) * (status.type === "new-car" ? 6 : 10));
+}
+
 function assertExpenseChangeAllowed(session, category) {
   if (category === "Housing" && (session.housingLeaseMonthsRemaining ?? 0) > 0) {
     throw new ApiError(
@@ -275,6 +296,16 @@ function assertExpenseChangeAllowed(session, category) {
       409,
       "TRANSPORTATION_TERM_ACTIVE",
       `Your transportation term has ${session.transportationTermMonthsRemaining} months remaining.`
+    );
+  }
+}
+
+function assertTransportationResolved(session) {
+  if (session.vehicleStatus?.broken) {
+    throw new ApiError(
+      409,
+      "CAR_REPAIR_REQUIRED",
+      "Your car is broken. Repair it, sell it, or switch transportation before advancing."
     );
   }
 }
@@ -611,6 +642,37 @@ gameRouter.post("/transportation/sell", async (req, res, next) => {
   }
 });
 
+gameRouter.post("/transportation/repair", async (req, res, next) => {
+  try {
+    const session = await getActiveSessionOrThrow(req.user._id);
+    const status = session.vehicleStatus;
+
+    if (!status || status.type === "none") {
+      throw new ApiError(400, "NO_CAR_OWNED", "You do not own a car.");
+    }
+
+    if (!status.broken) {
+      throw new ApiError(400, "CAR_NOT_BROKEN", "Your car does not need a breakdown repair.");
+    }
+
+    const repairCost = calculateVehicleRepairCost(status);
+    session.balance -= repairCost;
+    session.vehicleStatus = {
+      type: status.type,
+      mileage: status.mileage,
+      condition: status.type === "new-car" ? 88 : 62,
+      broken: false,
+      lastRepairCost: repairCost
+    };
+    await session.save();
+
+    const populated = await populateSession(GameSession.findById(session._id));
+    sendSuccess(res, { session: populated, repairCost });
+  } catch (error) {
+    next(error);
+  }
+});
+
 gameRouter.post("/enroll-college", validate(enrollSchema), async (req, res, next) => {
   try {
     const session = await getActiveSessionOrThrow(req.user._id);
@@ -633,6 +695,7 @@ gameRouter.post("/enroll-college", validate(enrollSchema), async (req, res, next
 gameRouter.post("/advance", validate(advanceSchema), async (req, res, next) => {
   try {
     const session = await getActiveSessionOrThrow(req.user._id);
+    assertTransportationResolved(session);
     const job = await Job.findById(session.currentJobId);
     const expenseOptions = await getExpenseOptionsBySelection(session.currentExpenseSelections);
 

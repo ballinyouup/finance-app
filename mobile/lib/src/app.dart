@@ -281,14 +281,14 @@ class _AuthPageState extends State<AuthPage> {
               const Icon(Icons.account_balance_wallet, size: 54),
               const SizedBox(height: 12),
               Text(
-                'Start with a job. Survive 12 months. See how much you can save.',
+                'MoneySim',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Manage work, college, expenses, needs, assets, debt, and monthly life events from your phone.',
+                'Choose work or college, plan each month, react to events, maintain your health, and build a life score from money, career, goals, and wellbeing.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 20),
@@ -459,6 +459,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _mutate(Future<GameSession> Function() action) async {
+    final previousHistoryLength = _session?.history.length ?? 0;
     setState(() {
       _busy = true;
       _error = null;
@@ -466,6 +467,10 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final session = await action();
       if (!mounted) return;
+      final eventRounds = session.history
+          .skip(previousHistoryLength)
+          .where((round) => round.eventTitle.isNotEmpty)
+          .toList();
       setState(() {
         if (session.status == 'dead') {
           _endedSession = session;
@@ -475,6 +480,12 @@ class _DashboardPageState extends State<DashboardPage> {
           _endedSession = null;
         }
       });
+      if (eventRounds.isNotEmpty) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => EventDialog(rounds: eventRounds),
+        );
+      }
     } on ApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } finally {
@@ -523,7 +534,7 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               StatusChip(
                 label: _session != null
-                    ? 'Alive'
+                    ? 'Active'
                     : _endedSession != null
                     ? 'Ended'
                     : 'Ready',
@@ -586,6 +597,8 @@ class _DashboardPageState extends State<DashboardPage> {
               onSellAsset: (holdingId) =>
                   _mutate(() => widget.api.sellAsset(widget.token, holdingId)),
               onSellCar: () => _mutate(() => widget.api.sellCar(widget.token)),
+              onRepairCar: () =>
+                  _mutate(() => widget.api.repairCar(widget.token)),
               onEnrollCollege: (major) =>
                   _mutate(() => widget.api.enrollCollege(widget.token, major)),
             )
@@ -740,7 +753,7 @@ class _StartRunViewState extends State<StartRunView> {
                 setState(() => _selections[category] = optionId),
           ),
           const Text(
-            'Higher-paying roles unlock through monthly job applications.',
+            'Only tier 1 starter jobs are available here. Higher-paying roles unlock through skills, experience, and monthly applications.',
             style: TextStyle(fontSize: 12),
           ),
           const SizedBox(height: 14),
@@ -781,6 +794,7 @@ class ActiveSessionView extends StatelessWidget {
     required this.onBuyAsset,
     required this.onSellAsset,
     required this.onSellCar,
+    required this.onRepairCar,
     required this.onEnrollCollege,
   });
 
@@ -800,6 +814,7 @@ class ActiveSessionView extends StatelessWidget {
   final ValueChanged<String> onBuyAsset;
   final ValueChanged<String> onSellAsset;
   final VoidCallback onSellCar;
+  final VoidCallback onRepairCar;
   final ValueChanged<String> onEnrollCollege;
 
   @override
@@ -827,6 +842,10 @@ class ActiveSessionView extends StatelessWidget {
         const SizedBox(height: 12),
         NeedsView(session: session),
         const SizedBox(height: 12),
+        if (session.medicalConditions.isNotEmpty) ...[
+          MedicalConditionsView(session: session),
+          const SizedBox(height: 12),
+        ],
         CareerView(
           session: session,
           optionsByCategory: optionsByCategory,
@@ -846,6 +865,7 @@ class ActiveSessionView extends StatelessWidget {
           onBuyAsset: onBuyAsset,
           onSellAsset: onSellAsset,
           onSellCar: onSellCar,
+          onRepairCar: onRepairCar,
         ),
         const SizedBox(height: 12),
         EducationView(
@@ -914,6 +934,10 @@ class LifeStatusCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 MetricTile(label: 'Balance', value: money(session.balance)),
+                MetricTile(
+                  label: 'Income',
+                  value: money(currentMonthlyIncome(session)),
+                ),
                 MetricTile(label: 'Debt', value: money(session.studentDebt)),
                 MetricTile(
                   label: 'Fixed Costs',
@@ -959,27 +983,14 @@ class _MonthlyPlanViewState extends State<MonthlyPlanView> {
       _choices.entertainmentDays * 18 +
       _choices.datingDays * 38;
 
-  double get _income {
-    final session = widget.session;
-    final enrolled =
-        session.lifePath == 'college' && session.educationMonths < 48;
-    final graduated =
-        session.lifePath == 'college' && session.educationMonths >= 48;
-    if (session.unemployedMonths > 0) return 0;
-    final careerMultiplier = 1 + session.careerLevel * 0.12;
-    final pathMultiplier = enrolled
-        ? 0.35
-        : graduated
-        ? 1.55
-        : 1;
-    return session.currentJob.monthlySalary * careerMultiplier * pathMultiplier;
-  }
+  double get _income => currentMonthlyIncome(widget.session, _choices);
 
   @override
   Widget build(BuildContext context) {
     final expenses =
         widget.session.fixedExpenses + _variableExpenses + _choices.debtPayment;
     final change = _income - expenses;
+    final hasBrokenCar = widget.session.vehicleStatus?.broken ?? false;
 
     return SectionCard(
       title: 'Monthly Plan',
@@ -1001,19 +1012,12 @@ class _MonthlyPlanViewState extends State<MonthlyPlanView> {
             ],
           ),
           const SizedBox(height: 12),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'study', label: Text('Study')),
-              ButtonSegment(value: 'exercise', label: Text('Exercise')),
-              ButtonSegment(value: 'recreation', label: Text('Fun')),
-              ButtonSegment(value: 'rest', label: Text('Rest')),
-            ],
-            selected: {_choices.activity},
-            onSelectionChanged: widget.busy
-                ? null
-                : (values) => setState(
-                    () => _choices = _choices.copyWith(activity: values.first),
-                  ),
+          FocusGrid(
+            value: _choices.activity,
+            enabled: !widget.busy,
+            onChanged: (activity) => setState(
+              () => _choices = _choices.copyWith(activity: activity),
+            ),
           ),
           if (widget.session.lifePath == 'college' &&
               widget.session.educationMonths < 48)
@@ -1066,12 +1070,19 @@ class _MonthlyPlanViewState extends State<MonthlyPlanView> {
                 () => _choices = _choices.copyWith(debtPayment: value),
               ),
             ),
+          if (hasBrokenCar) ...[
+            const SizedBox(height: 8),
+            const InfoBanner(
+              message:
+                  'Your car is broken. Repair it, sell it, or switch transportation before advancing.',
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: widget.busy
+                  onPressed: widget.busy || hasBrokenCar
                       ? null
                       : () => widget.onAdvance(1, _choices),
                   icon: const Icon(Icons.refresh),
@@ -1081,7 +1092,7 @@ class _MonthlyPlanViewState extends State<MonthlyPlanView> {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: widget.busy
+                  onPressed: widget.busy || hasBrokenCar
                       ? null
                       : () => widget.onAdvance(12, _choices),
                   icon: const Icon(Icons.calendar_month),
@@ -1112,6 +1123,34 @@ class NeedsView extends StatelessWidget {
           NeedBar(label: 'Entertainment', value: session.needs.entertainment),
           NeedBar(label: 'Love', value: session.needs.love),
           NeedBar(label: 'Energy', value: session.needs.energy),
+        ],
+      ),
+    );
+  }
+}
+
+class MedicalConditionsView extends StatelessWidget {
+  const MedicalConditionsView({super.key, required this.session});
+
+  final GameSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    return SectionCard(
+      title: 'Medical Conditions',
+      subtitle: 'Conditions add monthly costs and need pressure.',
+      child: Column(
+        children: [
+          for (final condition in session.medicalConditions)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.monitor_heart_outlined),
+              title: Text(condition.title),
+              subtitle: Text(
+                '${condition.cause} Treatment ${money(condition.monthlyCost)}/mo.',
+              ),
+              trailing: StatusChip(label: 'S${condition.severity}/5'),
+            ),
         ],
       ),
     );
@@ -1151,6 +1190,10 @@ class CareerView extends StatelessWidget {
             children: [
               MetricTile(label: 'Job', value: session.currentJob.title),
               MetricTile(
+                label: 'Income',
+                value: money(currentMonthlyIncome(session)),
+              ),
+              MetricTile(
                 label: 'Performance',
                 value: session.unemployedMonths > 0
                     ? 'Between jobs'
@@ -1187,33 +1230,134 @@ class CareerView extends StatelessWidget {
               StatusChip(label: applicationUsed ? 'Used' : 'Available'),
             ],
           ),
+          const SizedBox(height: 6),
+          Text(
+            session.unemployedMonths > 0
+                ? 'You are between jobs, so fallback roles can appear.'
+                : 'Openings show higher-paying roles while you are employed.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
           if (session.lastJobApplication != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: InfoBanner(message: session.lastJobApplication!.message),
             ),
           const SizedBox(height: 8),
-          for (final job in session.jobMarket)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                tileColor: Theme.of(context).colorScheme.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: const BorderSide(color: Color(0x14000000)),
-                ),
-                title: Text(job.title),
-                subtitle: Text(
-                  '${money(job.monthlySalary)}/mo · ${job.careerTrack} · ${job.requiredSkill} ${job.requiredSkillLevel}',
-                ),
-                trailing: FilledButton(
-                  onPressed: busy || applicationUsed
-                      ? null
-                      : () => onApplyForJob(job.id),
-                  child: const Text('Apply'),
+          if (session.jobMarket.isEmpty)
+            const Text('No openings are posted this month. Advance to refresh.')
+          else
+            for (final job in session.jobMarket)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Builder(
+                  builder: (context) {
+                    final lockMessage = jobLockMessage(job, session);
+                    final disabled =
+                        busy || applicationUsed || lockMessage != null;
+
+                    return ListTile(
+                      tileColor: Theme.of(context).colorScheme.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: const BorderSide(color: Color(0x14000000)),
+                      ),
+                      title: Text(job.title),
+                      subtitle: Text(
+                        [
+                          '${money(job.monthlySalary)}/mo · ${job.careerTrack} · ${job.requiredSkill} ${job.requiredSkillLevel}',
+                          if (lockMessage != null)
+                            '$lockMessage ${skillActionHint(job, session)}',
+                        ].join('\n'),
+                      ),
+                      isThreeLine: lockMessage != null,
+                      trailing: FilledButton(
+                        onPressed: disabled
+                            ? null
+                            : () => onApplyForJob(job.id),
+                        child: Text(lockMessage == null ? 'Apply' : 'Locked'),
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
+          const SizedBox(height: 8),
+          SkillGuide(session: session),
+        ],
+      ),
+    );
+  }
+}
+
+class SkillGuide extends StatelessWidget {
+  const SkillGuide({super.key, required this.session});
+
+  final GameSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final enrolled =
+        session.lifePath == 'college' && session.educationMonths < 48;
+    final performanceRemaining = (100 - session.careerPerformance)
+        .clamp(0, 100)
+        .round();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0x14000000)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Skills and experience',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              StatusChip(
+                label: session.unemployedMonths > 0
+                    ? 'Between jobs'
+                    : '$performanceRemaining to promotion',
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              MetricTile(
+                label: 'Technical',
+                value: '${formatSkill(session.skills['technical'] ?? 0)}/10',
+              ),
+              MetricTile(
+                label: 'Business',
+                value: '${formatSkill(session.skills['business'] ?? 0)}/10',
+              ),
+              MetricTile(
+                label: 'Communication',
+                value:
+                    '${formatSkill(session.skills['communication'] ?? 0)}/10',
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            enrolled
+                ? 'Study and internships grow your major skill while enrolled. Other skills grow through general Study after active enrollment.'
+                : 'Choose Study as your monthly focus to build communication, business, and technical skills.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Career performance rises faster when energy is at least 45 and happiness is at least 40.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );
@@ -1233,6 +1377,7 @@ class AssetsView extends StatefulWidget {
     required this.onBuyAsset,
     required this.onSellAsset,
     required this.onSellCar,
+    required this.onRepairCar,
   });
 
   final GameSession session;
@@ -1245,6 +1390,7 @@ class AssetsView extends StatefulWidget {
   final ValueChanged<String> onBuyAsset;
   final ValueChanged<String> onSellAsset;
   final VoidCallback onSellCar;
+  final VoidCallback onRepairCar;
 
   @override
   State<AssetsView> createState() => _AssetsViewState();
@@ -1265,6 +1411,9 @@ class _AssetsViewState extends State<AssetsView> {
     final stockValue = session.stockPortfolio?.value ?? 0;
     final stockInvested = session.stockPortfolio?.invested ?? 0;
     final canSellCar = session.vehicleStatus?.type == 'used-car';
+    final canRepairCar =
+        (session.vehicleStatus?.broken ?? false) &&
+        session.vehicleStatus?.type != 'none';
 
     return SectionCard(
       title: 'Assets and Debt',
@@ -1359,9 +1508,32 @@ class _AssetsViewState extends State<AssetsView> {
             ),
           const Divider(height: 28),
           Text(_carLabel(session.vehicleStatus)),
-          OutlinedButton(
-            onPressed: widget.busy || !canSellCar ? null : widget.onSellCar,
-            child: const Text('Sell Used Car'),
+          if (session.vehicleStatus?.broken ?? false)
+            Text(
+              'You cannot advance until this is resolved. Estimated repair: ${money(estimatedRepairCost(session.vehicleStatus!))}.',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: widget.busy || !canRepairCar
+                      ? null
+                      : widget.onRepairCar,
+                  icon: const Icon(Icons.build),
+                  label: const Text('Repair'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: widget.busy || !canSellCar
+                      ? null
+                      : widget.onSellCar,
+                  child: const Text('Sell Used Car'),
+                ),
+              ),
+            ],
           ),
           const Divider(height: 28),
           DropdownButtonFormField<String>(
@@ -1404,10 +1576,11 @@ class _AssetsViewState extends State<AssetsView> {
 
   String _carLabel(VehicleStatus? status) {
     if (status == null || status.type == 'none') return 'No car owned.';
+    final prefix = status.broken ? 'Broken · ' : '';
     if (status.type == 'new-car') {
-      return 'New car lease. Leased cars cannot be sold.';
+      return '${prefix}New car lease. Leased cars cannot be sold.';
     }
-    return 'Used car · condition ${status.condition.round()}% · ${status.mileage.round()} miles';
+    return '${prefix}Used car · condition ${status.condition.round()}% · ${status.mileage.round()} miles';
   }
 }
 
@@ -1553,7 +1726,7 @@ class ResultsView extends StatelessWidget {
     return SectionCard(
       title: session.deathRecap?['eventTitle'] == 'Run ended by player'
           ? 'Run Recap'
-          : 'Death Recap',
+          : 'Life Recap',
       subtitle:
           'Age ${session.ageYears}y ${session.ageRemainderMonths}m · ${session.deathReason ?? 'Your run ended.'}',
       child: Column(
@@ -1602,8 +1775,10 @@ class LeaderboardPage extends StatefulWidget {
 }
 
 class _LeaderboardPageState extends State<LeaderboardPage> {
+  final _searchController = TextEditingController();
   bool _loading = true;
   String? _error;
+  String _search = '';
   List<LeaderboardEntry> _entries = const [];
 
   @override
@@ -1612,19 +1787,36 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final entries = await widget.api.leaderboard();
+      final entries = await widget.api.leaderboard(50, _search);
       if (mounted) setState(() => _entries = entries);
     } on ApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _submitSearch() async {
+    setState(() => _search = _searchController.text.trim());
+    await _load();
+  }
+
+  Future<void> _clearSearch() async {
+    _searchController.clear();
+    setState(() => _search = '');
+    await _load();
   }
 
   @override
@@ -1640,20 +1832,61 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
+          const SizedBox(height: 6),
+          const Text('Search users and inspect their run recaps.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              labelText: 'Search user name',
+              suffixIcon: _search.isEmpty
+                  ? null
+                  : IconButton(
+                      onPressed: _loading ? null : _clearSearch,
+                      icon: const Icon(Icons.clear),
+                    ),
+            ),
+            textInputAction: TextInputAction.search,
+            onSubmitted: (_) => _loading ? null : _submitSearch(),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _loading ? null : _submitSearch,
+            icon: const Icon(Icons.search),
+            label: const Text('Search'),
+          ),
+          if (_search.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Showing runs from users matching "$_search".',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
           const SizedBox(height: 12),
           if (_loading)
             const Center(child: CircularProgressIndicator())
           else if (_error != null)
             ErrorBanner(message: _error!)
           else if (_entries.isEmpty)
-            const Text('No completed runs yet.')
+            Text(
+              _search.isEmpty
+                  ? 'No completed runs yet.'
+                  : 'No runs match that user search.',
+            )
           else
             for (var index = 0; index < _entries.length; index++)
               Card(
                 child: ListTile(
+                  onTap: () => showDialog<void>(
+                    context: context,
+                    builder: (context) =>
+                        LeaderboardRecapDialog(entry: _entries[index]),
+                  ),
                   leading: CircleAvatar(child: Text('${index + 1}')),
                   title: Text(_entries[index].name),
-                  subtitle: Text(dateLabel(_entries[index].completedAt)),
+                  subtitle: Text(
+                    '${dateLabel(_entries[index].completedAt)} · tap for recap',
+                  ),
                   trailing: Text(
                     money(_entries[index].finalScore),
                     style: const TextStyle(fontWeight: FontWeight.w700),
@@ -1662,6 +1895,97 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
               ),
         ],
       ),
+    );
+  }
+}
+
+class LeaderboardRecapDialog extends StatelessWidget {
+  const LeaderboardRecapDialog({super.key, required this.entry});
+
+  final LeaderboardEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final ageYears = entry.ageMonths ~/ 12;
+    final ageMonths = entry.ageMonths % 12;
+    final recap = entry.deathRecap ?? const <String, dynamic>{};
+    final recentHistory = entry.recentHistory.reversed.take(5).toList();
+
+    return AlertDialog(
+      title: Text('${entry.name} Recap'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Age ${ageYears}y ${ageMonths}m · ${entry.deathReason ?? stringValue(recap['reason'], 'Run ended.')}',
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                MetricTile(label: 'Score', value: money(entry.finalScore)),
+                MetricTile(label: 'Cash', value: money(entry.balance)),
+                MetricTile(label: 'Assets', value: money(entry.assetValue)),
+                MetricTile(label: 'Debt', value: money(entry.studentDebt)),
+                MetricTile(
+                  label: 'Job',
+                  value: stringValue(recap['jobTitle'], 'Unknown'),
+                ),
+                MetricTile(
+                  label: 'Path',
+                  value: entry.lifePath == 'college' ? 'College' : 'Work',
+                ),
+              ],
+            ),
+            if (entry.medicalConditions.isNotEmpty) ...[
+              const Divider(height: 24),
+              const Text(
+                'Medical conditions',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              for (final condition in entry.medicalConditions)
+                Text(
+                  '${condition.title} · severity ${condition.severity}/5 · ${money(condition.monthlyCost)}/mo',
+                ),
+            ],
+            if (entry.completedGoals.isNotEmpty) ...[
+              const Divider(height: 24),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final goal in entry.completedGoals)
+                    StatusChip(label: goal),
+                ],
+              ),
+            ],
+            const Divider(height: 24),
+            const Text(
+              'Recent choices and events',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            if (recentHistory.isEmpty)
+              const Text('No monthly history was recorded.')
+            else
+              for (final round in recentHistory)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Month ${round.month}: ${round.jobTitle} · income ${money(round.income)} · expenses ${money(round.expenses)}${round.eventTitle.isEmpty ? '' : ' · ${round.eventTitle}'}',
+                  ),
+                ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
     );
   }
 }
@@ -1696,6 +2020,51 @@ class SettingsPage extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class EventDialog extends StatelessWidget {
+  const EventDialog({super.key, required this.rounds});
+
+  final List<RoundHistory> rounds;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(rounds.length == 1 ? 'Month Event' : 'Month Events'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final round in rounds)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Month ${round.month}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    Text(round.eventTitle),
+                    if (round.eventAmount != 0)
+                      Text('Impact: ${signedMoney(round.eventAmount)}'),
+                    if (round.medicalConditionTitle.isNotEmpty)
+                      Text('New condition: ${round.medicalConditionTitle}'),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Continue'),
         ),
       ],
     );
@@ -1924,6 +2293,120 @@ class ChoiceStepper extends StatelessWidget {
   }
 }
 
+class FocusGrid extends StatelessWidget {
+  const FocusGrid({
+    super.key,
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String value;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  static const _options = [
+    ('study', Icons.school_outlined, 'Study', 'Build skills'),
+    ('rest', Icons.bedtime_outlined, 'Rest', 'Recover energy'),
+    ('exercise', Icons.fitness_center, 'Exercise', 'Energy tradeoff'),
+    ('recreation', Icons.celebration_outlined, 'Fun', 'Lift happiness'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Focus', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 8),
+        GridView.count(
+          crossAxisCount: 2,
+          childAspectRatio: 2.45,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          children: [
+            for (final option in _options)
+              FocusTile(
+                value: option.$1,
+                icon: option.$2,
+                title: option.$3,
+                subtitle: option.$4,
+                selected: value == option.$1,
+                enabled: enabled,
+                onChanged: onChanged,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class FocusTile extends StatelessWidget {
+  const FocusTile({
+    super.key,
+    required this.value,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String value;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return OutlinedButton(
+      onPressed: enabled ? () => onChanged(value) : null,
+      style: OutlinedButton.styleFrom(
+        alignment: Alignment.centerLeft,
+        backgroundColor: selected ? colorScheme.primaryContainer : null,
+        foregroundColor: selected ? colorScheme.onPrimaryContainer : null,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 19),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class SliderInput extends StatelessWidget {
   const SliderInput({
     super.key,
@@ -2044,6 +2527,80 @@ class StatusChip extends StatelessWidget {
       side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
     );
   }
+}
+
+const majorSkills = {
+  'computer-science': 'technical',
+  'business': 'business',
+  'communications': 'communication',
+};
+
+double currentMonthlyIncome(GameSession session, [MonthlyChoices? choices]) {
+  if (session.unemployedMonths > 0) return 0;
+
+  final monthlyChoices = choices ?? session.monthlyChoices;
+  final enrolled =
+      session.lifePath == 'college' && session.educationMonths < 48;
+  final graduated =
+      session.lifePath == 'college' && session.educationMonths >= 48;
+  final careerMultiplier = 1 + session.careerLevel * 0.12;
+  final degreeMultiplier = graduated ? 1.55 : 1.0;
+  final jobIncome =
+      session.currentJob.monthlySalary *
+      careerMultiplier *
+      degreeMultiplier *
+      (enrolled ? 0.35 : 1);
+  final internshipIncome = enrolled && monthlyChoices.internship ? 550.0 : 0.0;
+
+  return jobIncome + internshipIncome;
+}
+
+String formatSkill(double value) => value == value.roundToDouble()
+    ? value.round().toString()
+    : value.toStringAsFixed(1);
+
+String? jobLockMessage(Job job, GameSession session) {
+  final graduated =
+      session.lifePath == 'college' && session.educationMonths >= 48;
+
+  if (job.requiresDegree && !graduated) {
+    return 'Locked until you finish your degree.';
+  }
+
+  final skillLevel = session.skills[job.requiredSkill] ?? 0;
+  if (skillLevel < job.requiredSkillLevel) {
+    return 'Needs ${job.requiredSkillLevel} ${job.requiredSkill} skill.';
+  }
+
+  return null;
+}
+
+String skillActionHint(Job job, GameSession session) {
+  final graduated =
+      session.lifePath == 'college' && session.educationMonths >= 48;
+  if (job.requiresDegree && !graduated) {
+    return 'Finish 48 college months first.';
+  }
+
+  final enrolled =
+      session.lifePath == 'college' && session.educationMonths < 48;
+  if (enrolled) {
+    final majorSkill = majorSkills[session.major];
+    if (majorSkill == job.requiredSkill) {
+      return 'Use Study or internships to build it.';
+    }
+    return 'Your active major builds ${majorSkill ?? 'major'} skill; general Study helps after enrollment.';
+  }
+
+  return 'Use Study as your monthly focus to build skills.';
+}
+
+double estimatedRepairCost(VehicleStatus status) {
+  final baseCost = status.type == 'new-car' ? 450.0 : 650.0;
+  final wearCost =
+      (100 - status.condition.clamp(0, 100)) *
+      (status.type == 'new-car' ? 6 : 10);
+  return baseCost + wearCost;
 }
 
 Map<String, String> defaultSelections(

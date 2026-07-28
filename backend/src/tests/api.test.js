@@ -63,6 +63,16 @@ async function lowExpenseSelections() {
   );
 }
 
+async function expenseSelectionsByTier(tiers) {
+  const options = await ExpenseOption.find({});
+  return Object.fromEntries(
+    MONTHLY_EXPENSE_CATEGORIES.map((category) => [
+      category,
+      options.find((option) => option.category === category && option.tier === tiers[category])._id.toString()
+    ])
+  );
+}
+
 describe("auth routes", () => {
   it("rejects weak passwords during signup", async () => {
     const response = await request(app)
@@ -238,6 +248,12 @@ describe("catalog and game routes", () => {
 
     expect(started.status).toBe(201);
     expect(started.body.data.session.balance).toBe(500);
+    expect(started.body.data.session.jobMarketIds).toHaveLength(6);
+    expect(
+      started.body.data.session.jobMarketIds.every(
+        (marketJob) => !marketJob.requiresDegree && marketJob.monthlySalary > job.monthlySalary
+      )
+    ).toBe(true);
 
     const duplicate = await request(app)
       .post("/api/game/start")
@@ -261,6 +277,38 @@ describe("catalog and game routes", () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe("STARTER_JOB_REQUIRED");
+  });
+
+  it("only shows lower-paying job-market roles when the player is between jobs", async () => {
+    const user = await createUser();
+    const authorization = await authHeader(user);
+    const barista = await Job.findOne({ title: "Barista" });
+    const accountManager = await Job.findOne({ title: "Account Manager" });
+    const expenseSelections = await lowExpenseSelections();
+
+    await request(app)
+      .post("/api/game/start")
+      .set("Authorization", authorization)
+      .send({ lifePath: "work", jobId: barista._id.toString(), expenseSelections });
+
+    await GameSession.updateOne(
+      { userId: user._id, status: "active" },
+      {
+        currentJobId: accountManager._id,
+        unemployedMonths: 1,
+        jobMarketIds: []
+      }
+    );
+
+    const current = await request(app)
+      .get("/api/game/current")
+      .set("Authorization", authorization);
+
+    const marketJobs = current.body.data.session.jobMarketIds;
+    expect(current.status).toBe(200);
+    expect(marketJobs).toHaveLength(6);
+    expect(marketJobs.some((job) => job.monthlySalary < accountManager.monthlySalary)).toBe(true);
+    expect(marketJobs.every((job) => !job.requiresDegree)).toBe(true);
   });
 
   it("keeps degree-required jobs locked until a college player graduates", async () => {
@@ -511,7 +559,7 @@ describe("catalog and game routes", () => {
     expect(current.body.data.session).toBeNull();
   });
 
-  it("advances one month or one year and keeps the run active when death is not rolled", async () => {
+  it("advances one month or one year and keeps the run active when health risk is not rolled", async () => {
     const user = await createUser();
     const authorization = await authHeader(user);
     const job = await Job.findOne({ title: "Barista" });
@@ -543,7 +591,7 @@ describe("catalog and game routes", () => {
     expect(current.body.data.session.status).toBe("active");
   });
 
-  it("ends the run when statistical death is rolled", async () => {
+  it("adds a medical condition and keeps the run active when health risk is rolled", async () => {
     Math.random.mockReturnValue(0);
     const user = await createUser();
     const authorization = await authHeader(user);
@@ -565,11 +613,64 @@ describe("catalog and game routes", () => {
 
     const session = advanced.body.data.session;
     expect(advanced.status).toBe(200);
-    expect(session.status).toBe("dead");
-    expect(session.finalScore).toEqual(expect.any(Number));
-    expect(session.deathRecap.reason).toEqual(expect.any(String));
-    expect(session.deathRecap.chance).toBeGreaterThan(0);
-    expect(session.deathRecap.roll).toBe(0);
+    expect(session.status).toBe("active");
+    expect(session.finalScore).toBeUndefined();
+    expect(session.medicalConditions).toHaveLength(1);
+    expect(session.medicalConditions[0].title).toBe("Nutrition deficiency");
+    expect(session.history[0]).toMatchObject({
+      died: false,
+      medicalConditionTitle: "Nutrition deficiency"
+    });
+  });
+
+  it("blocks advancement until a broken car is repaired", async () => {
+    const user = await createUser();
+    const authorization = await authHeader(user);
+    const job = await Job.findOne({ title: "Barista" });
+    const expenseSelections = await expenseSelectionsByTier({
+      Housing: "Low",
+      Transportation: "Mid"
+    });
+
+    await request(app)
+      .post("/api/game/start")
+      .set("Authorization", authorization)
+      .send({ lifePath: "work", jobId: job._id.toString(), expenseSelections });
+
+    await GameSession.updateOne(
+      { userId: user._id, status: "active" },
+      {
+        $set: {
+          "vehicleStatus.broken": true,
+          "vehicleStatus.condition": 12,
+          "vehicleStatus.type": "used-car"
+        }
+      }
+    );
+
+    const blocked = await request(app)
+      .post("/api/game/advance")
+      .set("Authorization", authorization)
+      .send({ months: 1, choices: { foodDays: 20, entertainmentDays: 4, datingDays: 2 } });
+
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error.code).toBe("CAR_REPAIR_REQUIRED");
+
+    const repaired = await request(app)
+      .post("/api/game/transportation/repair")
+      .set("Authorization", authorization);
+
+    expect(repaired.status).toBe(200);
+    expect(repaired.body.data.repairCost).toBe(1530);
+    expect(repaired.body.data.session.vehicleStatus.broken).toBe(false);
+
+    const advanced = await request(app)
+      .post("/api/game/advance")
+      .set("Authorization", authorization)
+      .send({ months: 1, choices: { foodDays: 20, entertainmentDays: 4, datingDays: 2 } });
+
+    expect(advanced.status).toBe(200);
+    expect(advanced.body.data.session.currentMonth).toBe(2);
   });
 });
 
@@ -616,5 +717,91 @@ describe("leaderboard routes", () => {
       "High Score",
       "Low Score"
     ]);
+    expect(response.body.data.entries[0]).toMatchObject({
+      runId: expect.any(String),
+      ageMonths: STARTING_AGE_MONTHS + 12,
+      balance: 900,
+      recentHistory: []
+    });
+  });
+
+  it("searches leaderboard runs by user name and returns recap details", async () => {
+    const targetUser = await createUser({
+      email: "search-target@example.com",
+      name: "Specific Runner"
+    });
+    const otherUser = await createUser({
+      email: "other-runner@example.com",
+      name: "Other Runner"
+    });
+    const job = await Job.findOne({ title: "Barista" });
+    const selections = await lowExpenseSelections();
+
+    await GameSession.create([
+      {
+        userId: targetUser._id,
+        status: "dead",
+        currentMonth: 3,
+        ageMonths: STARTING_AGE_MONTHS + 2,
+        balance: 1200,
+        studentDebt: 200,
+        currentJobId: job._id,
+        currentExpenseSelections: selections,
+        finalScore: 1400,
+        deathReason: "You ended this run and started over.",
+        deathRecap: {
+          reason: "You ended this run and started over.",
+          finalScore: 1400,
+          jobTitle: "Barista",
+          eventTitle: "Run ended by player"
+        },
+        history: [
+          {
+            month: 1,
+            ageMonths: STARTING_AGE_MONTHS + 1,
+            path: "work",
+            jobTitle: "Barista",
+            income: 1800,
+            expenses: 1200,
+            eventTitle: "Promotion earned",
+            deathChance: 0.00005,
+            died: false,
+            balanceAfter: 1100,
+            studentDebtAfter: 0
+          }
+        ],
+        completedAt: new Date("2026-02-01T00:00:00.000Z")
+      },
+      {
+        userId: otherUser._id,
+        status: "dead",
+        currentMonth: 2,
+        ageMonths: STARTING_AGE_MONTHS + 1,
+        balance: 300,
+        currentJobId: job._id,
+        currentExpenseSelections: selections,
+        finalScore: 300,
+        completedAt: new Date("2026-02-02T00:00:00.000Z")
+      }
+    ]);
+
+    const response = await request(app).get("/api/leaderboard?search=specific&limit=10");
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.entries).toHaveLength(1);
+    expect(response.body.data.entries[0]).toMatchObject({
+      name: "Specific Runner",
+      deathReason: "You ended this run and started over.",
+      deathRecap: {
+        eventTitle: "Run ended by player",
+        jobTitle: "Barista"
+      },
+      recentHistory: [
+        {
+          month: 1,
+          eventTitle: "Promotion earned"
+        }
+      ]
+    });
   });
 });

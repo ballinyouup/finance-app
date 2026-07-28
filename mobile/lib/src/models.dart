@@ -316,6 +316,7 @@ class RoundHistory {
     required this.expenses,
     required this.eventTitle,
     required this.eventAmount,
+    required this.medicalConditionTitle,
     required this.deathChance,
     required this.died,
     required this.balanceAfter,
@@ -331,6 +332,7 @@ class RoundHistory {
     expenses: doubleValue(json['expenses']),
     eventTitle: stringValue(json['eventTitle']),
     eventAmount: doubleValue(json['eventAmount']),
+    medicalConditionTitle: stringValue(json['medicalConditionTitle']),
     deathChance: doubleValue(json['deathChance']),
     died: boolValue(json['died']),
     balanceAfter: doubleValue(json['balanceAfter']),
@@ -345,10 +347,38 @@ class RoundHistory {
   final double expenses;
   final String eventTitle;
   final double eventAmount;
+  final String medicalConditionTitle;
   final double deathChance;
   final bool died;
   final double balanceAfter;
   final double studentDebtAfter;
+}
+
+class MedicalCondition {
+  const MedicalCondition({
+    required this.title,
+    required this.cause,
+    required this.severity,
+    required this.monthlyCost,
+    required this.needs,
+    required this.createdMonth,
+  });
+
+  factory MedicalCondition.fromJson(JsonMap json) => MedicalCondition(
+    title: stringValue(json['title'], 'Medical condition'),
+    cause: stringValue(json['cause']),
+    severity: intValue(json['severity'], 1),
+    monthlyCost: doubleValue(json['monthlyCost']),
+    needs: NeedScores.fromJson(mapValue(json['needs'])),
+    createdMonth: intValue(json['createdMonth']),
+  );
+
+  final String title;
+  final String cause;
+  final int severity;
+  final double monthlyCost;
+  final NeedScores needs;
+  final int createdMonth;
 }
 
 class LastJobApplication {
@@ -405,6 +435,7 @@ class GameSession {
     required this.housingLeaseMonthsRemaining,
     required this.transportationTermMonthsRemaining,
     required this.vehicleStatus,
+    required this.medicalConditions,
     required this.stockPortfolio,
     required this.ownedHome,
     required this.assetHoldings,
@@ -432,7 +463,7 @@ class GameSession {
       major: json['major'] == null ? null : stringValue(json['major']),
       skills: mapValue(
         json['skills'],
-      ).map((key, value) => MapEntry(key, intValue(value))),
+      ).map((key, value) => MapEntry(key, doubleValue(value))),
       careerLevel: intValue(json['careerLevel']),
       careerPerformance: doubleValue(json['careerPerformance']),
       unemployedMonths: intValue(json['unemployedMonths']),
@@ -471,6 +502,9 @@ class GameSession {
       vehicleStatus: json['vehicleStatus'] == null
           ? null
           : VehicleStatus.fromJson(mapValue(json['vehicleStatus'])),
+      medicalConditions: mapList(
+        json['medicalConditions'],
+      ).map(MedicalCondition.fromJson).toList(),
       stockPortfolio: json['stockPortfolio'] == null
           ? null
           : StockPortfolio.fromJson(mapValue(json['stockPortfolio'])),
@@ -526,7 +560,7 @@ class GameSession {
   final double studentDebt;
   final int educationMonths;
   final String? major;
-  final Map<String, int> skills;
+  final Map<String, double> skills;
   final int careerLevel;
   final double careerPerformance;
   final int unemployedMonths;
@@ -542,6 +576,7 @@ class GameSession {
   final int housingLeaseMonthsRemaining;
   final int transportationTermMonthsRemaining;
   final VehicleStatus? vehicleStatus;
+  final List<MedicalCondition> medicalConditions;
   final StockPortfolio? stockPortfolio;
   final OwnedHome? ownedHome;
   final List<AssetHolding> assetHoldings;
@@ -554,23 +589,66 @@ class GameSession {
 
 class LeaderboardEntry {
   const LeaderboardEntry({
+    required this.runId,
     required this.userId,
     required this.name,
     required this.finalScore,
     required this.completedAt,
+    required this.lifePath,
+    required this.ageMonths,
+    required this.balance,
+    required this.studentDebt,
+    required this.assetValue,
+    required this.completedGoals,
+    required this.medicalConditions,
+    required this.deathReason,
+    required this.deathRecap,
+    required this.recentHistory,
   });
 
   factory LeaderboardEntry.fromJson(JsonMap json) => LeaderboardEntry(
+    runId: stringValue(json['runId']),
     userId: stringValue(json['userId']),
     name: stringValue(json['name'], 'Player'),
     finalScore: doubleValue(json['finalScore']),
     completedAt: stringValue(json['completedAt']),
+    lifePath: stringValue(json['lifePath'], 'work'),
+    ageMonths: intValue(json['ageMonths'], 216),
+    balance: doubleValue(json['balance']),
+    studentDebt: doubleValue(json['studentDebt']),
+    assetValue: doubleValue(json['assetValue']),
+    completedGoals: (json['completedGoals'] as List? ?? const [])
+        .map((item) => item.toString())
+        .toList(),
+    medicalConditions: mapList(
+      json['medicalConditions'],
+    ).map(MedicalCondition.fromJson).toList(),
+    deathReason: json['deathReason'] == null
+        ? null
+        : stringValue(json['deathReason']),
+    deathRecap: json['deathRecap'] == null
+        ? null
+        : mapValue(json['deathRecap']),
+    recentHistory: mapList(
+      json['recentHistory'],
+    ).map(RoundHistory.fromJson).toList(),
   );
 
+  final String runId;
   final String userId;
   final String name;
   final double finalScore;
   final String completedAt;
+  final String lifePath;
+  final int ageMonths;
+  final double balance;
+  final double studentDebt;
+  final double assetValue;
+  final List<String> completedGoals;
+  final List<MedicalCondition> medicalConditions;
+  final String? deathReason;
+  final JsonMap? deathRecap;
+  final List<RoundHistory> recentHistory;
 }
 
 class HomeOption {

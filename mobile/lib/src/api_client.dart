@@ -345,8 +345,26 @@ class ApiClient {
     return GameSession.fromJson(mapValue(data['session']));
   }
 
-  Future<List<LeaderboardEntry>> leaderboard([int limit = 20]) async {
-    final data = await _request('/leaderboard?limit=$limit');
+  Future<GameSession> repairCar(String token) async {
+    final data = await _request(
+      '/game/transportation/repair',
+      method: 'POST',
+      token: token,
+    );
+    return GameSession.fromJson(mapValue(data['session']));
+  }
+
+  Future<List<LeaderboardEntry>> leaderboard([
+    int limit = 20,
+    String search = '',
+  ]) async {
+    final params = {'limit': '$limit'};
+    if (search.trim().isNotEmpty) {
+      params['search'] = search.trim();
+    }
+    final data = await _request(
+      '/leaderboard?${Uri(queryParameters: params).query}',
+    );
     return mapList(data['entries']).map(LeaderboardEntry.fromJson).toList();
   }
 }

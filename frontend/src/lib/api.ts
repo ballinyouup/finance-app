@@ -106,6 +106,7 @@ export type RoundHistory = {
   expenses: number
   eventTitle?: string
   eventAmount?: number
+  medicalConditionTitle?: string
   deathChance: number
   died: boolean
   needsAfter: NeedScores
@@ -152,6 +153,15 @@ export type GameSession = {
     broken: boolean
     lastRepairCost: number
   }
+  medicalConditions: Array<{
+    _id?: string
+    title: string
+    cause: string
+    severity: number
+    monthlyCost: number
+    needs: NeedScores
+    createdMonth: number
+  }>
   stockPortfolio?: StockPortfolio
   ownedHome?: OwnedHome
   assetHoldings: AssetHolding[]
@@ -175,10 +185,21 @@ export type GameSession = {
 }
 
 export type LeaderboardEntry = {
+  runId: string
   userId: string
   name: string
   finalScore: number
   completedAt: string
+  lifePath: LifePath
+  ageMonths: number
+  balance: number
+  studentDebt: number
+  assetValue: number
+  completedGoals: string[]
+  medicalConditions: GameSession["medicalConditions"]
+  deathReason?: string
+  deathRecap?: GameSession["deathRecap"]
+  recentHistory: RoundHistory[]
 }
 
 type ApiEnvelope<T> =
@@ -416,6 +437,17 @@ export const api = {
       method: "POST",
       token,
     }),
-  leaderboard: (limit = 20) =>
-    apiRequest<{ entries: LeaderboardEntry[] }>(`/leaderboard?limit=${limit}`),
+  repairCar: (token: string) =>
+    apiRequest<{ session: GameSession; repairCost: number }>("/game/transportation/repair", {
+      method: "POST",
+      token,
+    }),
+  leaderboard: (limit = 20, search = "") => {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (search.trim()) {
+      params.set("search", search.trim())
+    }
+
+    return apiRequest<{ entries: LeaderboardEntry[] }>(`/leaderboard?${params}`)
+  },
 }

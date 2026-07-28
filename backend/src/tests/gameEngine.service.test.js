@@ -44,6 +44,7 @@ function createSession(overrides = {}) {
       energy: 70
     },
     history: [],
+    medicalConditions: [],
     assetHoldings: [],
     stockPortfolio: { invested: 0, value: 0 },
     ...overrides
@@ -178,7 +179,34 @@ describe("game engine service", () => {
     vi.restoreAllMocks();
   });
 
-  it("ends the run when low needs create a death chance and the death roll lands under it", () => {
+  it("lets players who are not actively enrolled build general skills by studying", () => {
+    vi.spyOn(Math, "random").mockReturnValue(1);
+    const session = createSession({
+      lifePath: "college",
+      major: "computer-science",
+      educationMonths: 48,
+      skills: { technical: 6, business: 1, communication: 1 }
+    });
+
+    applyMonthResult(session, baristaJob, lowExpenseOptions, {
+      foodDays: 20,
+      entertainmentDays: 4,
+      datingDays: 2,
+      activity: "study",
+      internship: true,
+      debtPayment: 0
+    });
+
+    expect(session.skills).toMatchObject({
+      technical: 6.25,
+      business: 1.35,
+      communication: 1.5
+    });
+
+    vi.restoreAllMocks();
+  });
+
+  it("adds a medical condition when low needs create health risk and the roll lands under it", () => {
     const randomValues = [...Array(11).fill(1), 0];
     vi.spyOn(Math, "random").mockImplementation(() => randomValues.shift() ?? 1);
     const session = createSession({
@@ -201,16 +229,19 @@ describe("game engine service", () => {
       debtPayment: 0
     });
 
-    expect(session.status).toBe("dead");
-    expect(session.finalScore).toEqual(expect.any(Number));
-    expect(session.deathReason).toBe("Poor nutrition caught up with you.");
-    expect(session.deathRecap).toMatchObject({
-      roll: 0,
-      balance: session.balance,
-      studentDebt: 0,
-      jobTitle: "Barista"
+    expect(session.status).toBe("active");
+    expect(session.finalScore).toBeUndefined();
+    expect(session.medicalConditions).toHaveLength(1);
+    expect(session.medicalConditions[0]).toMatchObject({
+      title: "Nutrition deficiency",
+      severity: 2,
+      monthlyCost: 95
     });
-    expect(session.completedAt).toBeInstanceOf(Date);
+    expect(session.history[0]).toMatchObject({
+      died: false,
+      medicalConditionTitle: "Nutrition deficiency"
+    });
+    expect(session.completedAt).toBeUndefined();
 
     vi.restoreAllMocks();
   });

@@ -15,6 +15,14 @@ const needsSchema = {
   energy: { type: Number, default: STARTING_NEEDS.energy, min: 0, max: 100 }
 };
 
+const needsEffectSchema = {
+  happiness: { type: Number, default: 0 },
+  hunger: { type: Number, default: 0 },
+  entertainment: { type: Number, default: 0 },
+  love: { type: Number, default: 0 },
+  energy: { type: Number, default: 0 }
+};
+
 const monthlyChoicesSchema = {
   foodDays: { type: Number, default: 20, min: 0, max: 30 },
   entertainmentDays: { type: Number, default: 4, min: 0, max: 30 },
@@ -41,6 +49,7 @@ const historySchema = new mongoose.Schema(
     loanChange: { type: Number, default: 0 },
     eventTitle: { type: String },
     eventAmount: { type: Number, default: 0 },
+    medicalConditionTitle: { type: String },
     deathChance: { type: Number, required: true },
     died: { type: Boolean, default: false },
     needsAfter: needsSchema,
@@ -48,6 +57,18 @@ const historySchema = new mongoose.Schema(
     studentDebtAfter: { type: Number, required: true }
   },
   { _id: false }
+);
+
+const medicalConditionSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    cause: { type: String, required: true },
+    severity: { type: Number, default: 1, min: 1, max: 5 },
+    monthlyCost: { type: Number, default: 0, min: 0 },
+    needs: needsEffectSchema,
+    createdMonth: { type: Number, required: true, min: 1 }
+  },
+  { timestamps: false }
 );
 
 const expenseSelectionsSchema = Object.fromEntries(
@@ -160,6 +181,7 @@ const gameSessionSchema = new mongoose.Schema(
     housingLeaseMonthsRemaining: { type: Number, default: 12, min: 0 },
     transportationTermMonthsRemaining: { type: Number, default: 12, min: 0 },
     vehicleStatus: { type: vehicleStatusSchema, default: () => ({}) },
+    medicalConditions: { type: [medicalConditionSchema], default: [] },
     stockPortfolio: { type: stockPortfolioSchema, default: () => ({}) },
     ownedHome: { type: ownedHomeSchema },
     assetHoldings: { type: [assetHoldingSchema], default: [] },

@@ -43,19 +43,22 @@ export function applyMonthResult(session, job, expenseOptions, choices = {}) {
   const internshipIncome = getInternshipIncome(session, monthlyChoices);
   const transportation = applyContractAndVehicleMonth(session, expenseOptions);
   const wealth = applyWealthMonth(session);
+  const medicalBurden = getMedicalBurden(session.medicalConditions ?? []);
   const totalIncome = roundMoney(calculateIncome(session, job) + internshipIncome + Math.max(event?.amount ?? 0, 0) + loanChange);
-  const totalExpenses = roundMoney(calculateMonthlyFixedExpenses(expenseOptions) + calculateVariableExpenses(monthlyChoices) + debtPayment + transportation.cost + wealth.homeUpkeep + Math.max(-(event?.amount ?? 0), 0));
+  const totalExpenses = roundMoney(calculateMonthlyFixedExpenses(expenseOptions) + calculateVariableExpenses(monthlyChoices) + debtPayment + transportation.cost + wealth.homeUpkeep + medicalBurden.monthlyCost + Math.max(-(event?.amount ?? 0), 0));
   const balanceAfter = roundMoney(session.balance + totalIncome - totalExpenses);
-  const needsAfter = applyNeedsChanges(session.needs, [getMonthlyNeedEffects(monthlyChoices), getActivityEffects(monthlyChoices.activity), getExpenseQualityEffects(expenseOptions, session), getFinancialStressEffects(balanceAfter, session.studentDebt + loanChange), event?.needs ?? {}]);
+  const needsAfter = applyNeedsChanges(session.needs, [getMonthlyNeedEffects(monthlyChoices), getActivityEffects(monthlyChoices.activity), getExpenseQualityEffects(expenseOptions, session), medicalBurden.needs, getFinancialStressEffects(balanceAfter, session.studentDebt + loanChange), event?.needs ?? {}]);
   const skillsAfter = applySkillProgress(session, monthlyChoices);
   const nextAgeMonths = session.ageMonths + 1;
   const nextEducationMonths = session.lifePath === "college" && session.educationMonths < COLLEGE.monthsToGraduate ? session.educationMonths + 1 : session.educationMonths;
   const nextStudentDebt = Math.max(0, roundMoney(session.studentDebt + loanChange - debtPayment));
   const graduatedThisMonth = session.lifePath === "college" && session.educationMonths < COLLEGE.monthsToGraduate && nextEducationMonths >= COLLEGE.monthsToGraduate;
   const career = updateCareer(session, needsAfter, skillsAfter, job, event);
-  const deathChance = calculateDeathChance(nextAgeMonths, needsAfter, balanceAfter, nextStudentDebt);
-  const deathRoll = Math.random();
-  const died = deathRoll < deathChance;
+  const healthRisk = calculateHealthRisk(nextAgeMonths, needsAfter, balanceAfter, nextStudentDebt, session.medicalConditions ?? []);
+  const healthRoll = Math.random();
+  const medicalCondition = healthRoll < healthRisk
+    ? addMedicalCondition(session, createMedicalCondition(nextAgeMonths, needsAfter, balanceAfter, nextStudentDebt, event, session.currentMonth))
+    : null;
 
   session.balance = balanceAfter;
   session.needs = needsAfter;
@@ -68,38 +71,23 @@ export function applyMonthResult(session, job, expenseOptions, choices = {}) {
   session.careerPerformance = career.performance;
   session.unemployedMonths = career.unemployedMonths;
   session.completedGoals = updateGoals(session, nextAgeMonths, nextEducationMonths, nextStudentDebt);
-  session.history.push({ month: session.currentMonth - 1, ageMonths: nextAgeMonths, path: session.lifePath, jobTitle: job.title, income: totalIncome, expenses: totalExpenses, loanChange, eventTitle: [event?.title, transportation.eventTitle, wealth.eventTitle, graduatedThisMonth ? "Graduation ceremony" : null, career.promoted ? "Promotion earned" : null].filter(Boolean).join(" · ") || undefined, eventAmount: (event?.amount ?? 0) - transportation.cost - wealth.homeUpkeep, deathChance, died, needsAfter, balanceAfter, studentDebtAfter: nextStudentDebt });
+  session.history.push({ month: session.currentMonth - 1, ageMonths: nextAgeMonths, path: session.lifePath, jobTitle: job.title, income: totalIncome, expenses: totalExpenses, loanChange, eventTitle: [event?.title, transportation.eventTitle, wealth.eventTitle, graduatedThisMonth ? "Graduation ceremony" : null, career.promoted ? "Promotion earned" : null, medicalCondition?.title].filter(Boolean).join(" · ") || undefined, eventAmount: (event?.amount ?? 0) - transportation.cost - wealth.homeUpkeep - medicalBurden.monthlyCost, medicalConditionTitle: medicalCondition?.title, deathChance: healthRisk, died: false, needsAfter, balanceAfter, studentDebtAfter: nextStudentDebt });
 
-  if (died) {
-    session.status = "dead";
-    session.finalScore = calculateFinalScore(session);
-    session.deathReason = getDeathReason(nextAgeMonths, needsAfter, balanceAfter, nextStudentDebt, event);
-    session.deathRecap = {
-      reason: session.deathReason,
-      roll: roundMoney(deathRoll),
-      chance: deathChance,
-      ageMonths: nextAgeMonths,
-      balance: balanceAfter,
-      studentDebt: nextStudentDebt,
-      assetValue: calculateInvestableAssets(session),
-      finalScore: session.finalScore,
-      jobTitle: job.title,
-      eventTitle: event?.title,
-      needs: needsAfter
-    };
-    session.completedAt = new Date();
-  }
   return session;
 }
 
 export function applyMonths(session, job, expenseOptions, choices, months) {
-  for (let i = 0; i < clampInteger(months, 1, 12) && session.status === "active"; i += 1) applyMonthResult(session, job, expenseOptions, choices);
+  for (let i = 0; i < clampInteger(months, 1, 12) && session.status === "active"; i += 1) {
+    applyMonthResult(session, job, expenseOptions, choices);
+    if (session.vehicleStatus?.broken) break;
+  }
   return session;
 }
 
 export function calculateFinalScore(session) {
   const averageNeeds = (session.needs.happiness + session.needs.hunger + session.needs.entertainment + session.needs.love + (session.needs.energy ?? 70)) / 5;
-  return Math.round(session.balance + calculateInvestableAssets(session) - session.studentDebt + (session.ageMonths / 12 - 18) * 250 + (averageNeeds - 50) * 30 + (session.completedGoals?.length ?? 0) * 500);
+  const conditionPenalty = (session.medicalConditions ?? []).reduce((total, condition) => total + (condition.severity ?? 1) * 300, 0);
+  return Math.round(session.balance + calculateInvestableAssets(session) - session.studentDebt + (session.ageMonths / 12 - 18) * 250 + (averageNeeds - 50) * 30 + (session.completedGoals?.length ?? 0) * 500 - conditionPenalty);
 }
 
 export function calculateInvestableAssets(session) {
@@ -161,13 +149,14 @@ function getFinancialStressEffects(balance, studentDebt) { return { happiness: (
 function applySkillProgress(session, choices) {
   const skills = { technical: session.skills?.technical ?? 0, business: session.skills?.business ?? 0, communication: session.skills?.communication ?? 0 };
   const majorSkill = MAJOR_SKILLS[session.major] ?? "communication";
-  if (choices.activity === "study" && session.lifePath === "college") skills[majorSkill] = Math.min(10, skills[majorSkill] + 1);
-  if (choices.activity === "study" && session.lifePath !== "college") {
+  const enrolled = session.lifePath === "college" && session.educationMonths < COLLEGE.monthsToGraduate;
+  if (choices.activity === "study" && enrolled) skills[majorSkill] = Math.min(10, skills[majorSkill] + 1);
+  if (choices.activity === "study" && !enrolled) {
     skills.communication = Math.min(10, skills.communication + 0.5);
     skills.business = Math.min(10, skills.business + 0.35);
     skills.technical = Math.min(10, skills.technical + 0.25);
   }
-  if (choices.internship && session.lifePath === "college") skills[majorSkill] = Math.min(10, skills[majorSkill] + 1);
+  if (choices.internship && enrolled) skills[majorSkill] = Math.min(10, skills[majorSkill] + 1);
   if (choices.activity === "recreation") skills.communication = Math.min(10, skills.communication + 0.25);
   return skills;
 }
@@ -291,7 +280,23 @@ function applyNeedsChanges(currentNeeds, changes) {
   return next;
 }
 
-function calculateDeathChance(ageMonths, needs, balance, studentDebt) {
+function getMedicalBurden(conditions) {
+  return conditions.reduce(
+    (burden, condition) => ({
+      monthlyCost: burden.monthlyCost + (condition.monthlyCost ?? 0),
+      needs: {
+        happiness: burden.needs.happiness + (condition.needs?.happiness ?? 0),
+        hunger: burden.needs.hunger + (condition.needs?.hunger ?? 0),
+        entertainment: burden.needs.entertainment + (condition.needs?.entertainment ?? 0),
+        love: burden.needs.love + (condition.needs?.love ?? 0),
+        energy: burden.needs.energy + (condition.needs?.energy ?? 0)
+      }
+    }),
+    { monthlyCost: 0, needs: { happiness: 0, hunger: 0, entertainment: 0, love: 0, energy: 0 } }
+  );
+}
+
+function calculateHealthRisk(ageMonths, needs, balance, studentDebt, conditions = []) {
   const ageYears = ageMonths / 12;
   let chance = ageYears >= 50 ? 0.0005 : 0.00005;
   if (ageMonths / 12 > 45) chance += (ageMonths / 12 - 45) * 0.0008;
@@ -301,17 +306,119 @@ function calculateDeathChance(ageMonths, needs, balance, studentDebt) {
   if (needs.energy < 20) chance += (20 - needs.energy) * 0.002;
   if (balance < -5000) chance += 0.015;
   if (studentDebt > 90000) chance += 0.004;
+  chance += conditions.reduce((total, condition) => total + (condition.severity ?? 1) * 0.0006, 0);
   return clamp(roundMoney(chance), 0.00005, 0.55);
 }
-function getDeathReason(ageMonths, needs, balance, studentDebt, event) {
-  if (needs.hunger < 20) return "Poor nutrition caught up with you.";
-  if (needs.energy < 20) return "Exhaustion caught up with you.";
-  if (needs.happiness < 15) return "Your mental health collapsed.";
-  if (balance < -5000) return "Financial stress became overwhelming.";
-  if (studentDebt > 90000) return "Crushing student debt took a severe toll.";
-  if (ageMonths / 12 > 70) return "Old age caught up with you.";
-  if (event?.title) return `A rare complication followed ${event.title.toLowerCase()}.`;
-  return "A rare unexpected life event ended the run.";
+
+function createMedicalCondition(ageMonths, needs, balance, studentDebt, event, currentMonth) {
+  const ageYears = ageMonths / 12;
+
+  if (needs.hunger < 20) {
+    return {
+      title: "Nutrition deficiency",
+      cause: "Low food planning pushed hunger into a dangerous range.",
+      severity: 2,
+      monthlyCost: 95,
+      needs: { happiness: -1, hunger: -2, entertainment: 0, love: 0, energy: -2 },
+      createdMonth: currentMonth
+    };
+  }
+
+  if (needs.energy < 20) {
+    return {
+      title: "Chronic exhaustion",
+      cause: "Sustained low energy became a medical condition.",
+      severity: 2,
+      monthlyCost: 85,
+      needs: { happiness: -1, hunger: 0, entertainment: 0, love: 0, energy: -3 },
+      createdMonth: currentMonth
+    };
+  }
+
+  if (needs.happiness < 15) {
+    return {
+      title: "Anxiety disorder",
+      cause: "Low happiness and stress took a lasting toll.",
+      severity: 2,
+      monthlyCost: 120,
+      needs: { happiness: -3, hunger: 0, entertainment: -1, love: -1, energy: -1 },
+      createdMonth: currentMonth
+    };
+  }
+
+  if (balance < -5000) {
+    return {
+      title: "Stress hypertension",
+      cause: "Deep negative cash flow created serious financial stress.",
+      severity: 2,
+      monthlyCost: 110,
+      needs: { happiness: -2, hunger: 0, entertainment: 0, love: -1, energy: -1 },
+      createdMonth: currentMonth
+    };
+  }
+
+  if (studentDebt > 90000) {
+    return {
+      title: "Debt-related stress condition",
+      cause: "Crushing student debt became a health burden.",
+      severity: 1,
+      monthlyCost: 75,
+      needs: { happiness: -2, hunger: 0, entertainment: 0, love: 0, energy: -1 },
+      createdMonth: currentMonth
+    };
+  }
+
+  if (ageYears > 70) {
+    return {
+      title: "Age-related condition",
+      cause: "Aging added a chronic health concern.",
+      severity: 1,
+      monthlyCost: 140,
+      needs: { happiness: 0, hunger: 0, entertainment: 0, love: 0, energy: -2 },
+      createdMonth: currentMonth
+    };
+  }
+
+  if (event?.title) {
+    return {
+      title: "Event complication",
+      cause: `A complication followed ${event.title.toLowerCase()}.`,
+      severity: 1,
+      monthlyCost: 90,
+      needs: { happiness: -1, hunger: 0, entertainment: 0, love: 0, energy: -1 },
+      createdMonth: currentMonth
+    };
+  }
+
+  return {
+    title: "Unexpected health condition",
+    cause: "A low-probability health event added an ongoing condition.",
+    severity: 1,
+    monthlyCost: 90,
+    needs: { happiness: -1, hunger: 0, entertainment: 0, love: 0, energy: -1 },
+    createdMonth: currentMonth
+  };
+}
+
+function addMedicalCondition(session, condition) {
+  const existing = (session.medicalConditions ?? []).find((current) => current.title === condition.title);
+
+  if (existing) {
+    existing.severity = Math.min(5, (existing.severity ?? 1) + 1);
+    existing.monthlyCost = Math.round((existing.monthlyCost ?? 0) + condition.monthlyCost * 0.5);
+    existing.cause = `${condition.cause} The condition worsened.`;
+    return {
+      title: `${condition.title} worsened`,
+      cause: existing.cause,
+      severity: existing.severity,
+      monthlyCost: existing.monthlyCost,
+      needs: existing.needs,
+      createdMonth: existing.createdMonth
+    };
+  }
+
+  session.medicalConditions = [...(session.medicalConditions ?? []), condition];
+  return condition;
 }
 function pickRandomEvent(path) { for (const event of RANDOM_EVENTS) if ((!event.path || event.path === path) && Math.random() < event.chance) return event; return null; }
 function clampInteger(value, min, max) { return Math.max(min, Math.min(max, Number.parseInt(value, 10))); }
